@@ -33,38 +33,60 @@ const (
 	Unknown Status = "unknown"
 )
 
-type Visibility string
-
-const (
-	Private Visibility = "private"
-	Public  Visibility = "public"
-)
-
 type Feed struct {
-	Schema      int        `json:"schema"`
-	Feed        string     `json:"feed"`
-	Title       string     `json:"title,omitempty"`
-	Status      Status     `json:"status"`
-	Summary     string     `json:"summary,omitempty"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ExpectEvery string     `json:"expect_every,omitempty"`
-	Visibility  Visibility `json:"visibility,omitempty"`
-	Metrics     []Metric   `json:"metrics,omitempty"`
-	Checks      []Check    `json:"checks,omitempty"`
+	Schema      int       `json:"schema"`
+	Feed        string    `json:"feed"`
+	Title       string    `json:"title,omitempty"`
+	Status      Status    `json:"status"`
+	Summary     string    `json:"summary,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	ExpectEvery string    `json:"expect_every,omitempty"`
+	Metrics     []Metric  `json:"metrics,omitempty"`
+	Checks      []Check   `json:"checks,omitempty"`
+	Links       []Link    `json:"links,omitempty"`
 }
 
+// Labels say which thing a metric or check is about (e.g. endpoint=styles). Metrics with
+// the same key and label names form a table in the hub: one row per label value.
+type Labels map[string]string
+
 type Metric struct {
-	Key        string     `json:"key"`
-	Label      string     `json:"label,omitempty"`
-	Value      float64    `json:"value"`
-	Unit       string     `json:"unit,omitempty"`
-	Visibility Visibility `json:"visibility,omitempty"`
+	Key     string  `json:"key"`
+	Label   string  `json:"label,omitempty"`
+	Value   float64 `json:"value"`
+	Unit    string  `json:"unit,omitempty"`
+	Labels  Labels  `json:"labels,omitempty"`
+	Primary bool    `json:"primary,omitempty"`
 }
 
 type Check struct {
 	Name   string `json:"name"`
 	Status Status `json:"status"`
 	Detail string `json:"detail,omitempty"`
+	Labels Labels `json:"labels,omitempty"`
+}
+
+type Link struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// SeriesID identifies a metric within its feed: the key plus its labels, sorted
+// ("records.new{endpoint=styles}").
+func (m Metric) SeriesID() string {
+	if len(m.Labels) == 0 {
+		return m.Key
+	}
+	names := make([]string, 0, len(m.Labels))
+	for k := range m.Labels {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	parts := make([]string, len(names))
+	for i, k := range names {
+		parts[i] = k + "=" + m.Labels[k]
+	}
+	return m.Key + "{" + strings.Join(parts, ",") + "}"
 }
 
 var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
@@ -76,8 +98,19 @@ func validStatus(s Status) bool {
 	return s == OK || s == Warn || s == Fail || s == Unknown
 }
 
-func validVisibility(v Visibility, optional bool) bool {
-	return v == Private || v == Public || (optional && v == "")
+func validLabels(l Labels) error {
+	if len(l) > 4 {
+		return fmt.Errorf("%d labels, at most 4", len(l))
+	}
+	for k, v := range l {
+		if !ValidName(k) {
+			return fmt.Errorf("label name %q is not a valid name", k)
+		}
+		if v == "" || len([]rune(v)) > 64 || strings.ContainsAny(v, ",={}") {
+			return fmt.Errorf("label %s: value must be 1-64 characters without , = { }", k)
+		}
+	}
+	return nil
 }
 
 // Validate checks f against SPEC.md and returns every problem found, joined.
@@ -109,29 +142,33 @@ func (f *Feed) Validate() error {
 			bad("expect_every: %q is not a positive duration (e.g. 5m, 26h)", f.ExpectEvery)
 		}
 	}
-	if !validVisibility(f.Visibility, true) {
-		bad("visibility: must be private or public")
-	}
 	if len(f.Metrics) > 100 {
 		bad("metrics: %d, at most 100", len(f.Metrics))
 	}
 	seen := map[string]bool{}
+	primary := 0
 	for i, m := range f.Metrics {
 		at := fmt.Sprintf("metrics[%d]", i)
+		if err := validLabels(m.Labels); err != nil {
+			bad("%s.labels: %v", at, err)
+		}
 		if !ValidName(m.Key) {
 			bad("%s.key: %q is not a valid key", at, m.Key)
-		} else if seen[m.Key] {
-			bad("%s.key: %q appears twice", at, m.Key)
+		} else if seen[m.SeriesID()] {
+			bad("%s: %s appears twice", at, m.SeriesID())
 		}
-		seen[m.Key] = true
+		seen[m.SeriesID()] = true
+		if m.Primary {
+			primary++
+		}
 		if math.IsNaN(m.Value) || math.IsInf(m.Value, 0) {
 			bad("%s.value: must be a finite number", at)
 		}
 		tooLong(at+".label", m.Label, 100)
 		tooLong(at+".unit", m.Unit, 16)
-		if !validVisibility(m.Visibility, true) {
-			bad("%s.visibility: must be private or public", at)
-		}
+	}
+	if primary > 6 {
+		bad("metrics: %d marked primary, at most 6", primary)
 	}
 	if len(f.Checks) > 50 {
 		bad("checks: %d, at most 50", len(f.Checks))
@@ -146,6 +183,22 @@ func (f *Feed) Validate() error {
 			bad("%s.status: must be ok, warn, fail or unknown", at)
 		}
 		tooLong(at+".detail", c.Detail, 500)
+		if err := validLabels(c.Labels); err != nil {
+			bad("%s.labels: %v", at, err)
+		}
+	}
+	if len(f.Links) > 10 {
+		bad("links: %d, at most 10", len(f.Links))
+	}
+	for i, l := range f.Links {
+		at := fmt.Sprintf("links[%d]", i)
+		if strings.TrimSpace(l.Title) == "" {
+			bad("%s.title: required", at)
+		}
+		tooLong(at+".title", l.Title, 100)
+		if !(strings.HasPrefix(l.URL, "https://") || strings.HasPrefix(l.URL, "http://")) || len(l.URL) > 500 || strings.ContainsAny(l.URL, " \t\n") {
+			bad("%s.url: must be an http(s) URL of at most 500 characters", at)
+		}
 	}
 	return errors.Join(errs...)
 }

@@ -120,12 +120,12 @@ func cmdPut(args []string) error {
 	title := fs.String("title", "", "display name")
 	summary := fs.String("summary", "", "one line for people")
 	every := fs.String("expect-every", "", "longest normal gap between updates (e.g. 26h); stale after")
-	public := fs.Bool("public", false, "show this feed on the hub's public page")
 	fromJSON := fs.String("json", "", "read the whole document from FILE (- for stdin)")
-	var metrics, checks, publicMetrics repeated
-	fs.Var(&metrics, "metric", "key=value[:unit[:label]] (repeatable)")
-	fs.Var(&checks, "check", "name=status[:detail] (repeatable)")
-	fs.Var(&publicMetrics, "public-metric", "show this metric key publicly (repeatable)")
+	var metrics, checks, primary, links repeated
+	fs.Var(&metrics, "metric", "key[{name=value,…}]=value[:unit[:label]] (repeatable)")
+	fs.Var(&checks, "check", "name[{name=value,…}]=status[:detail] (repeatable)")
+	fs.Var(&primary, "primary", "mark this metric key as a headline number (repeatable)")
+	fs.Var(&links, "link", "title=url (repeatable)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func cmdPut(args []string) error {
 		// The document is the whole feed: other flags would be silently ignored, so refuse them.
 		var extra []string
 		fs.Visit(func(fl *flag.Flag) {
-			if fl.Name != "json" && fl.Name != "feeds" && fl.Name != "public-metric" {
+			if fl.Name != "json" && fl.Name != "feeds" && fl.Name != "primary" {
 				extra = append(extra, "--"+fl.Name)
 			}
 		})
@@ -161,9 +161,6 @@ func cmdPut(args []string) error {
 			Summary: *summary, UpdatedAt: time.Now().UTC().Truncate(time.Second),
 			ExpectEvery: *every,
 		}
-		if *public {
-			f.Visibility = feed.Public
-		}
 		for _, m := range metrics {
 			metric, err := parseMetric(m)
 			if err != nil {
@@ -178,32 +175,77 @@ func cmdPut(args []string) error {
 			}
 			f.Checks = append(f.Checks, check)
 		}
+		for _, l := range links {
+			title, url, ok := strings.Cut(l, "=")
+			if !ok {
+				return fmt.Errorf("--link %q: want title=url", l)
+			}
+			f.Links = append(f.Links, feed.Link{Title: title, URL: url})
+		}
 	}
-	for _, key := range publicMetrics {
+	for _, key := range primary {
 		found := false
 		for i := range f.Metrics {
 			if f.Metrics[i].Key == key {
-				f.Metrics[i].Visibility, found = feed.Public, true
+				f.Metrics[i].Primary, found = true, true
 			}
 		}
 		if !found {
-			return fmt.Errorf("--public-metric %s: no such metric", key)
+			return fmt.Errorf("--primary %s: no such metric", key)
 		}
 	}
 	return feed.Write(*feeds, f)
 }
 
-func parseMetric(s string) (feed.Metric, error) {
-	key, rest, ok := strings.Cut(s, "=")
+// splitLabels splits "key{a=b,c=d}" into the key and its labels.
+func splitLabels(s string) (string, feed.Labels, error) {
+	key, rest, ok := strings.Cut(s, "{")
 	if !ok {
-		return feed.Metric{}, fmt.Errorf("--metric %q: want key=value[:unit[:label]]", s)
+		return s, nil, nil
+	}
+	body, ok := strings.CutSuffix(rest, "}")
+	if !ok {
+		return "", nil, fmt.Errorf("%q: labels must end with }", s)
+	}
+	labels := feed.Labels{}
+	for _, pair := range strings.Split(body, ",") {
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok {
+			return "", nil, fmt.Errorf("%q: labels are name=value pairs", s)
+		}
+		labels[k] = v
+	}
+	return key, labels, nil
+}
+
+// cutTarget splits "key{labels}=rest" at the "=" after any labels.
+func cutTarget(s string) (string, string, bool) {
+	start := 0
+	if i := strings.Index(s, "}"); i >= 0 {
+		start = i
+	}
+	i := strings.Index(s[start:], "=")
+	if i < 0 {
+		return "", "", false
+	}
+	return s[:start+i], s[start+i+1:], true
+}
+
+func parseMetric(s string) (feed.Metric, error) {
+	target, rest, ok := cutTarget(s)
+	if !ok {
+		return feed.Metric{}, fmt.Errorf("--metric %q: want key[{labels}]=value[:unit[:label]]", s)
+	}
+	key, labels, err := splitLabels(target)
+	if err != nil {
+		return feed.Metric{}, fmt.Errorf("--metric %w", err)
 	}
 	parts := strings.SplitN(rest, ":", 3)
 	value, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return feed.Metric{}, fmt.Errorf("--metric %s: %q is not a number", key, parts[0])
 	}
-	m := feed.Metric{Key: key, Value: value}
+	m := feed.Metric{Key: key, Value: value, Labels: labels}
 	if len(parts) > 1 {
 		m.Unit = parts[1]
 	}
@@ -214,12 +256,16 @@ func parseMetric(s string) (feed.Metric, error) {
 }
 
 func parseCheck(s string) (feed.Check, error) {
-	name, rest, ok := strings.Cut(s, "=")
+	target, rest, ok := cutTarget(s)
 	if !ok {
-		return feed.Check{}, fmt.Errorf("--check %q: want name=status[:detail]", s)
+		return feed.Check{}, fmt.Errorf("--check %q: want name[{labels}]=status[:detail]", s)
+	}
+	name, labels, err := splitLabels(target)
+	if err != nil {
+		return feed.Check{}, fmt.Errorf("--check %w", err)
 	}
 	status, detail, _ := strings.Cut(rest, ":")
-	return feed.Check{Name: name, Status: feed.Status(status), Detail: detail}, nil
+	return feed.Check{Name: name, Status: feed.Status(status), Detail: detail, Labels: labels}, nil
 }
 
 func readInput(path string) ([]byte, error) {

@@ -27,13 +27,20 @@ At the end of a job:
 
 ```bash
 beacon put nightly-sync --status ok --title "Nightly sync" --expect-every 26h \
-  --summary "12 endpoints, 0 failing" \
-  --metric records.new=12:count:"New records" --metric duration=58:s \
-  --check "endpoints fresh=ok"
+  --summary "1,204 records, 0 errors" \
+  --metric records.new=12:count:New --metric duration=58:s:Duration \
+  --primary records.new --primary duration \
+  --metric 'records.new{endpoint=styles}=9:count:New' \
+  --check 'fresh=ok' --link "Run log=https://example.com/log"
 ```
 
 From a JSON document (anything that can print JSON): `producer | beacon put my-feed --json -`.
 `schema`, `feed` and `updated_at` are filled in when missing.
+
+Feeds describe, the hub presents (SPEC.md → How hubs present feeds): mark the headline
+numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that are
+about one of several things (`endpoint=styles`): the hub turns those into a table with a
+row per thing, without any display code anywhere.
 
 On a timer: put an executable in `/etc/beacon/collectors.d/` that prints one feed
 document. `beacon collect` (every minute, `beacon-collect.timer`) runs each one with a

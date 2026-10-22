@@ -70,7 +70,7 @@ func runOne(ctx context.Context, path, feedsDir string, timeout time.Duration, n
 		Summary: truncate("collector failed: "+err.Error(), 500),
 	}
 	if prev, ok, _ := feed.Load(feedsDir, name); ok && prev != nil {
-		failed.Title, failed.ExpectEvery, failed.Visibility = prev.Title, prev.ExpectEvery, prev.Visibility
+		failed.Title, failed.ExpectEvery, failed.Links = prev.Title, prev.ExpectEvery, prev.Links
 	}
 	if werr := feed.Write(feedsDir, failed); werr != nil {
 		res.Err = fmt.Errorf("%w (and writing the failure: %v)", err, werr)

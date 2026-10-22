@@ -70,6 +70,13 @@ func Feed(root string, now time.Time) (*feed.Feed, error) {
 	add("uptime", "Uptime", uptime, "s")
 	add("reboot.required", "Reboot pending", boolValue(reboot), "")
 
+	for i, m := range f.Metrics { // the headline numbers
+		switch m.Key {
+		case "disk.used", "mem.used", "load.1", "uptime":
+			f.Metrics[i].Primary = true
+		}
+	}
+
 	f.Checks = []feed.Check{
 		threshold("disk", diskUsed, 85, 95),
 		threshold("memory", memUsed, 90, 98),

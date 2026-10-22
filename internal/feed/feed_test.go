@@ -40,17 +40,51 @@ func TestWriteThenLoadRoundTrips(t *testing.T) {
 
 func TestValidateReportsEveryProblem(t *testing.T) {
 	f := sample()
-	f.Schema, f.Feed, f.Status, f.ExpectEvery, f.Visibility = 2, "Bad Name", "great", "soon", "secret"
+	f.Schema, f.Feed, f.Status, f.ExpectEvery = 2, "Bad Name", "great", "soon"
 	f.Metrics = append(f.Metrics, Metric{Key: "records.new", Value: 1})
-	f.Checks = append(f.Checks, Check{Name: " ", Status: "meh"})
+	f.Metrics = append(f.Metrics, Metric{Key: "x", Value: 1, Labels: Labels{"Bad": "v"}})
+	f.Checks = append(f.Checks, Check{Name: " ", Status: "meh", Labels: Labels{"endpoint": "a,b"}})
+	f.Links = []Link{{Title: "", URL: "ftp://x"}}
 	err := f.Validate()
 	if err == nil {
 		t.Fatal("want errors")
 	}
-	for _, want := range []string{"schema", "feed:", "status:", "expect_every", "visibility", "appears twice", "checks[1].name", "checks[1].status"} {
+	for _, want := range []string{"schema", "feed:", "status:", "expect_every", "appears twice",
+		"metrics[2].labels", "checks[1].name", "checks[1].status", "checks[1].labels", "links[0].title", "links[0].url"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error doesn't mention %q:\n%v", want, err)
 		}
+	}
+}
+
+func TestLabelsMakeSeriesDistinct(t *testing.T) {
+	f := sample()
+	f.Metrics = []Metric{
+		{Key: "records.new", Value: 1, Labels: Labels{"endpoint": "styles"}},
+		{Key: "records.new", Value: 2, Labels: Labels{"endpoint": "boms"}},
+		{Key: "records.new", Value: 3},
+	}
+	if err := f.Validate(); err != nil {
+		t.Fatalf("same key, different labels: %v", err)
+	}
+	m := Metric{Key: "k", Labels: Labels{"b": "2", "a": "1"}}
+	if got := m.SeriesID(); got != "k{a=1,b=2}" {
+		t.Fatalf("SeriesID = %q", got)
+	}
+	f.Metrics = append(f.Metrics, Metric{Key: "records.new", Value: 4, Labels: Labels{"endpoint": "boms"}})
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "records.new{endpoint=boms} appears twice") {
+		t.Fatalf("duplicate series accepted: %v", err)
+	}
+}
+
+func TestAtMostSixPrimaryMetrics(t *testing.T) {
+	f := sample()
+	f.Metrics = nil
+	for i := 0; i < 7; i++ {
+		f.Metrics = append(f.Metrics, Metric{Key: "m" + string(rune('a'+i)), Value: 1, Primary: true})
+	}
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "primary") {
+		t.Fatalf("7 primary metrics accepted: %v", err)
 	}
 }
 
