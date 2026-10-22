@@ -8,20 +8,26 @@
 #   --binary PATH         install this binary instead of downloading one (e.g. go build)
 #   --source NAME         this box's name in the hub (default: hostname; kept once set)
 #   --tunnel-token FILE   also run a Cloudflare Tunnel with this token (from the hub's
-#                         `lookout source add`), so the hub reaches beacon with no open port
+#                         `lookout source tunnel`), so the hub reaches beacon with no open port
+#   --tunnel-hostname H   the private hostname the hub uses for this box (from the same
+#                         command), e.g. beacon.web-1.lookout.internal
+#   --tunnel-address IP   the private address beacon listens on for the tunnel
+#                         (default 10.249.0.1; added to lo, never routed off the box)
 #
 # Idempotent: re-run to update. Never touches existing feeds, tokens or collectors.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="" BINARY="" SOURCE="" TUNNEL_TOKEN=""
+VERSION="" BINARY="" SOURCE="" TUNNEL_TOKEN="" TUNNEL_HOSTNAME="" TUNNEL_ADDRESS="10.249.0.1"
 while (( $# )); do
   case "$1" in
     --version) VERSION="$2"; shift 2 ;;
     --binary) BINARY="$2"; shift 2 ;;
     --source) SOURCE="$2"; shift 2 ;;
     --tunnel-token) TUNNEL_TOKEN="$2"; shift 2 ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    --tunnel-hostname) TUNNEL_HOSTNAME="$2"; shift 2 ;;
+    --tunnel-address) TUNNEL_ADDRESS="$2"; shift 2 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "install: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -30,6 +36,12 @@ step() { printf '\n== %s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "run as root"
+if [[ -n "$TUNNEL_TOKEN" || -n "$TUNNEL_HOSTNAME" ]]; then
+  [[ -n "$TUNNEL_TOKEN" && -n "$TUNNEL_HOSTNAME" ]] || die "--tunnel-token and --tunnel-hostname go together"
+  [[ "$TUNNEL_HOSTNAME" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || die "--tunnel-hostname: not a hostname"
+  [[ "$TUNNEL_ADDRESS" =~ ^(10|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\. ]] \
+    || die "--tunnel-address: use a private (RFC 1918) address; Cloudflare refuses loopback"
+fi
 command -v systemctl >/dev/null || die "needs systemd"
 
 step "binary"
@@ -102,12 +114,26 @@ if [[ -n "$TUNNEL_TOKEN" ]]; then
     apt-get update -q >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -yq cloudflared >/dev/null
   fi
   cloudflared --version
+  # Cloudflare won't connect a Worker to loopback, so beacon listens on a private address
+  # that exists only on this box (on lo: nothing routes to it from outside). The hub's
+  # hostname route for this box is resolved by cloudflared here, hence the hosts entry.
+  install -d -m 755 /etc/systemd/system/beacon.service.d
+  cat > /etc/systemd/system/beacon.service.d/tunnel.conf <<EOF
+# Written by beacon install.sh --tunnel-*: listen on $TUNNEL_ADDRESS for the tunnel.
+[Service]
+ExecStartPre=+/usr/sbin/ip address replace $TUNNEL_ADDRESS/32 dev lo
+Environment=BEACON_LISTEN=$TUNNEL_ADDRESS:7600
+EOF
+  sed -i "/ # beacon tunnel (install.sh)\$/d" /etc/hosts
+  echo "$TUNNEL_ADDRESS $TUNNEL_HOSTNAME # beacon tunnel (install.sh)" >> /etc/hosts
   install -m 600 "$TUNNEL_TOKEN" /etc/beacon/tunnel.token
   install -m 644 "$REPO/deploy/beacon-tunnel.service" /etc/systemd/system/beacon-tunnel.service
   systemctl daemon-reload
+  systemctl restart beacon.service
   systemctl enable --quiet beacon-tunnel.service
   systemctl restart beacon-tunnel.service
-  systemctl is-active beacon-tunnel.service
+  systemctl is-active beacon.service beacon-tunnel.service
+  curl -fsS "http://$TUNNEL_HOSTNAME:7600/healthz" >/dev/null && echo "beacon answers on $TUNNEL_HOSTNAME:7600"
 fi
 
 step "status"
