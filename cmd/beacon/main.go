@@ -135,6 +135,16 @@ func cmdPut(args []string) error {
 
 	var f *feed.Feed
 	if *fromJSON != "" {
+		// The document is the whole feed: other flags would be silently ignored, so refuse them.
+		var extra []string
+		fs.Visit(func(fl *flag.Flag) {
+			if fl.Name != "json" && fl.Name != "feeds" && fl.Name != "public-metric" {
+				extra = append(extra, "--"+fl.Name)
+			}
+		})
+		if len(extra) > 0 {
+			return usageError{fmt.Sprintf("--json takes the whole feed from the document; drop %s", strings.Join(extra, " "))}
+		}
 		data, err := readInput(*fromJSON)
 		if err != nil {
 			return err

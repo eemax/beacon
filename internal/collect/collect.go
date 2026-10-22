@@ -110,7 +110,7 @@ func FromJSON(data []byte, name string, now func() time.Time) (*feed.Feed, error
 	if err := json.Unmarshal(data, &probe); err != nil {
 		return nil, fmt.Errorf("output is not a JSON object: %w", err)
 	}
-	defaults := map[string]any{"schema": feed.Schema, "feed": name, "updated_at": now().UTC()}
+	defaults := map[string]any{"schema": feed.Schema, "feed": name, "updated_at": now().UTC().Truncate(time.Second)}
 	for key, value := range defaults {
 		if _, set := probe[key]; !set {
 			raw, _ := json.Marshal(value)
