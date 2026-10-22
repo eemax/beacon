@@ -51,8 +51,7 @@ the hub shows it as stale, whatever its status says.
 
 ```bash
 git clone https://github.com/eemax/beacon /opt/beacon
-/opt/beacon/install.sh --source <box-name> \
-  [--tunnel-token FILE --tunnel-hostname beacon.<box-name>.lookout.internal]
+/opt/beacon/install.sh --source <box-name> [--tunnel-token FILE --tunnel-address 10.249.x.y]
 beacon token add lookout > /path/for/the/hub   # shown once
 ```
 
@@ -68,18 +67,17 @@ collectors. `--binary ./beacon` installs a local build instead.
 | `beacon-tunnel.service` | with `--tunnel-*`: cloudflared, outbound only, so the hub reaches the box with no open port; plus a drop-in that puts beacon on the tunnel address |
 
 The tunnel is the only way in. The hub (a Cloudflare Worker) reaches beacon through the
-box's tunnel over Workers VPC: one VPC Network binding, plus a private hostname route per
-box (`beacon.<box>.lookout.internal`, resolved on the box). No public hostname, no inbound
-port, works behind NAT. Cloudflare won't connect a Worker to loopback, so in tunnel mode
-beacon listens on a private address that exists only on the box (`--tunnel-address`,
-default `10.249.0.1`, added to `lo`; nothing routes to it from outside), and the installer
-adds the hostname to `/etc/hosts`. On the hub, `lookout source tunnel <box>` creates the
-tunnel and route and prints the token for `--tunnel-token`.
+box's tunnel over Workers VPC: one VPC Network binding, and per box one private `/32`
+(from `10.249.0.0/16`) routed to that box's tunnel. No public hostname, no inbound port,
+no DNS, works behind NAT. Cloudflare won't connect a Worker to loopback, so in tunnel mode
+beacon listens on that private address, which exists only on the box (added to `lo`;
+nothing routes to it from outside). On the hub, `lookout source tunnel <box>` creates the
+tunnel, assigns the address and prints the token: pass them as `--tunnel-token` and
+`--tunnel-address`.
 
-macOS works too (no installer, no host feed): `sudo ifconfig lo0 alias 10.249.0.1/32`,
-a `10.249.0.1 beacon.<box>.lookout.internal` line in `/etc/hosts`, then
-`beacon serve --listen 10.249.0.1:7600 --feeds DIR --tokens FILE` and
-`cloudflared tunnel run --token-file FILE`.
+macOS works too (no installer, no host feed): `sudo ifconfig lo0 alias <address>/32`
+(gone after a restart), then `beacon serve --listen <address>:7600 --feeds DIR --tokens FILE`
+and `cloudflared tunnel run --token-file FILE`.
 
 ## Commands
 
