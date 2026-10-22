@@ -15,15 +15,15 @@ timer.
 ```json
 {
   "schema": 1,
-  "feed": "centric-api",
-  "title": "Centric fetch",
+  "feed": "nightly-sync",
+  "title": "Nightly sync",
   "status": "ok",
   "summary": "12 endpoints fetched, 0 failing",
   "updated_at": "2026-10-22T01:01:12Z",
   "expect_every": "26h",
   "visibility": "private",
   "metrics": [
-    { "key": "styles.new", "label": "New styles", "value": 12, "unit": "count" },
+    { "key": "records.new", "label": "New records", "value": 12, "unit": "count" },
     { "key": "duration", "value": 58, "unit": "s", "visibility": "public" }
   ],
   "checks": [
@@ -82,7 +82,7 @@ Anything else is `404`, any method but `GET`/`HEAD` is `405`.
 ```json
 {
   "schema": 1,
-  "source": "ysera",
+  "source": "web-1",
   "beacon": "0.1.0",
   "generated_at": "2026-10-22T01:02:00Z",
   "feeds": [ { "schema": 1, "feed": "host", "...": "..." } ],

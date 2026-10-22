@@ -10,9 +10,9 @@ import (
 
 func sample() *Feed {
 	return &Feed{
-		Schema: Schema, Feed: "centric-api", Title: "Centric fetch", Status: OK,
+		Schema: Schema, Feed: "nightly-sync", Title: "Nightly sync", Status: OK,
 		UpdatedAt: time.Date(2026, 10, 22, 1, 1, 12, 0, time.UTC), ExpectEvery: "26h",
-		Metrics: []Metric{{Key: "styles.new", Value: 12, Unit: "count"}},
+		Metrics: []Metric{{Key: "records.new", Value: 12, Unit: "count"}},
 		Checks:  []Check{{Name: "endpoints fresh", Status: OK}},
 	}
 }
@@ -22,14 +22,14 @@ func TestWriteThenLoadRoundTrips(t *testing.T) {
 	if err := Write(dir, sample()); err != nil {
 		t.Fatal(err)
 	}
-	got, ok, err := Load(dir, "centric-api")
+	got, ok, err := Load(dir, "nightly-sync")
 	if err != nil || !ok {
 		t.Fatalf("Load: ok=%v err=%v", ok, err)
 	}
 	if got.Metrics[0].Value != 12 || got.ExpectEvery != "26h" || !got.UpdatedAt.Equal(sample().UpdatedAt) {
 		t.Fatalf("round trip changed the feed: %+v", got)
 	}
-	info, _ := os.Stat(filepath.Join(dir, "centric-api.json"))
+	info, _ := os.Stat(filepath.Join(dir, "nightly-sync.json"))
 	if info.Mode().Perm() != 0o644 {
 		t.Fatalf("mode %v, want 0644", info.Mode().Perm())
 	}
@@ -41,7 +41,7 @@ func TestWriteThenLoadRoundTrips(t *testing.T) {
 func TestValidateReportsEveryProblem(t *testing.T) {
 	f := sample()
 	f.Schema, f.Feed, f.Status, f.ExpectEvery, f.Visibility = 2, "Bad Name", "great", "soon", "secret"
-	f.Metrics = append(f.Metrics, Metric{Key: "styles.new", Value: 1})
+	f.Metrics = append(f.Metrics, Metric{Key: "records.new", Value: 1})
 	f.Checks = append(f.Checks, Check{Name: " ", Status: "meh"})
 	err := f.Validate()
 	if err == nil {
@@ -90,8 +90,8 @@ func TestLoadAllReadsOnlyRegularFeedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(feeds) != 1 || feeds[0].Feed != "centric-api" {
-		t.Fatalf("feeds = %+v, want only centric-api", feeds)
+	if len(feeds) != 1 || feeds[0].Feed != "nightly-sync" {
+		t.Fatalf("feeds = %+v, want only nightly-sync", feeds)
 	}
 	files := map[string]bool{}
 	for _, inv := range invalid {

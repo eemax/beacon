@@ -26,9 +26,9 @@ The feed format and the HTTP API are in [SPEC.md](SPEC.md).
 At the end of a job:
 
 ```bash
-beacon put centric-api --status ok --title "Centric fetch" --expect-every 26h \
+beacon put nightly-sync --status ok --title "Nightly sync" --expect-every 26h \
   --summary "12 endpoints, 0 failing" \
-  --metric styles.new=12:count:"New styles" --metric duration=58:s \
+  --metric records.new=12:count:"New records" --metric duration=58:s \
   --check "endpoints fresh=ok"
 ```
 
@@ -37,7 +37,7 @@ From a JSON document (anything that can print JSON): `producer | beacon put my-f
 
 On a timer: put an executable in `/etc/beacon/collectors.d/` that prints one feed
 document. `beacon collect` (every minute, `beacon-collect.timer`) runs each one with a
-30 s limit; the feed is named after the file (`centric.sh` → `centric`) unless the
+30 s limit; the feed is named after the file (`backup.sh` → `backup`) unless the
 document says otherwise. A collector that fails or prints garbage still produces its feed,
 with status `fail` and the reason, so the hub sees the failure.
 
@@ -108,3 +108,7 @@ go build ./cmd/beacon
 ```
 
 Releases: push a `vX.Y.Z` tag; CI builds linux/darwin × amd64/arm64 with `SHA256SUMS`.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
