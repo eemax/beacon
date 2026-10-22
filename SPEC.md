@@ -1,140 +1,187 @@
-# Beacon feed format, schema 1
+# beacon v2: what a box tells its hub
 
-A **source** (a box running beacon) publishes **feeds**: small JSON documents, one file
-per feed, in its feeds folder (`/var/lib/beacon/feeds/<feed>.json`). A hub
-([lookout](https://github.com/eemax/lookout)) reads them over beacon's read-only HTTP API,
-keeps the history, draws the dashboard and sends the alerts.
+A **box** runs beacon. beacon knows the box's **components** (the things you care about on
+it: a nightly integration, a report job, a backup, the host itself) and keeps:
 
-A feed says how one thing on the box is doing: the box itself, a nightly integration,
-a backup, a report run. Anything that can write a file can publish one, usually through
-`beacon put` at the end of a job, or a collector script that `beacon collect` runs on a
-timer.
+- **state**: what each component is now (gauges, checks, a schedule, a run in progress), a
+  snapshot that's overwritten;
+- **a log** of **runs** (every execution of a component's job) and **events** (reboots,
+  deploys, config changes, notes), append-only.
 
-**Producers describe, hubs present.** A feed never says how to draw anything. It says
-what each number *is* (unit, which thing it's about, whether it's a headline), and the hub
-derives the layout from that, the same way for every feed. Adding a feed or a metric never
-needs a change in the hub.
+A hub ([lookout](https://github.com/eemax/lookout)) reads both over beacon's read-only HTTP
+API: the state on every poll, the log from where it left off, so it sees every run exactly
+once. The design behind this is lookout's `docs/design.md`.
 
-## Document
+**Producers describe, hubs present.** Nothing here says how to draw anything; it says what
+things are (units, labels, headline numbers, outcomes, schedules), and the hub derives the
+display from that the same way for every component.
 
-```json
-{
-  "schema": 1,
-  "feed": "nightly-sync",
-  "title": "Nightly sync",
-  "status": "ok",
-  "summary": "delta sync, 1,851 records in 2.1 min: 697 new, 927 changed",
-  "updated_at": "2026-10-22T01:02:12Z",
-  "expect_every": "26h",
-  "metrics": [
-    { "key": "duration", "label": "Duration", "value": 124, "unit": "s", "primary": true },
-    { "key": "records.new", "label": "New", "value": 697, "unit": "count", "primary": true },
-    { "key": "records.total", "label": "Records", "value": 30538, "unit": "count", "labels": { "endpoint": "styles" } },
-    { "key": "records.new", "label": "New", "value": 17, "unit": "count", "labels": { "endpoint": "styles" } },
-    { "key": "records.total", "label": "Records", "value": 16274, "unit": "count", "labels": { "endpoint": "boms" } },
-    { "key": "records.new", "label": "New", "value": 29, "unit": "count", "labels": { "endpoint": "boms" } }
-  ],
-  "checks": [
-    { "name": "healthy", "status": "ok", "labels": { "endpoint": "styles" } },
-    { "name": "healthy", "status": "warn", "detail": "2 pages retried", "labels": { "endpoint": "boms" } }
-  ],
-  "links": [{ "title": "Run log", "url": "https://example.com/runs/latest" }]
-}
-```
+## Common shapes
+
+**Metric** (a gauge of the state, or a stat of a run):
 
 | Field | Required | Rules |
 |---|---|---|
-| `schema` | yes | `1` |
-| `feed` | yes | Name, same as the file name without `.json`. `[a-z0-9][a-z0-9._-]*`, at most 64 characters |
-| `title` | no | Display name, at most 100 characters. Hubs fall back to `feed` |
-| `status` | yes | `ok`, `warn`, `fail` or `unknown`: the producer's own verdict |
-| `summary` | no | One line for people, at most 500 characters |
-| `updated_at` | yes | RFC 3339 time the producer last wrote the feed (`beacon put` sets it) |
-| `expect_every` | no | Longest normal gap between updates, as a duration (`90s`, `5m`, `26h`). After `updated_at + expect_every` the hub treats the feed as **stale**, whatever its `status` says: a producer that died can't report it. Leave it out for feeds that only change on events |
-| `metrics` | no | At most 100 (below) |
-| `checks` | no | At most 50 (below) |
-| `links` | no | At most 10. Each: `title` (at most 100) and `url` (`http(s)://`, at most 500): where to look further (a report folder, a run log) |
+| `key` | yes | `[a-z0-9][a-z0-9._-]*`, at most 64 characters |
+| `value` | yes | a finite number |
+| `label` | no | at most 100; sentence case, without the component's name (`New records`). Hubs fall back to the key |
+| `unit` | no | at most 16: `count`, `percent` (0-100), `bytes`, `s`, `ms`, or anything else (shown after the value) |
+| `labels` | no | at most 4 `{"name": "value"}`: which of several things it's about (`{"endpoint": "styles"}`). Names like keys, values 1-64 characters without `, = { }` |
+| `primary` | no | `true` for a headline number (at most 6 per list) |
 
-**Metric:** `key` (same pattern as `feed`), `value` (a finite number), and optionally
-`label` (at most 100), `unit` (at most 16), `labels`, `primary`. A metric is identified by
-its key plus its labels: `records.new` and `records.new{endpoint=styles}` are different
-series, and each may appear once.
+A metric's identity is its key plus its labels (`records.new{endpoint=styles}`); each may
+appear once per list.
 
-**Check:** `name` (at most 100), `status` (as above), optionally `detail` (at most 500)
-and `labels`.
+**Check:** `name` (at most 100), `status` (`ok`, `warn`, `fail`, `unknown`), optional
+`detail` (at most 500) and `labels`.
 
-**Labels:** at most 4 per metric or check, `{"name": "value"}`, names like `feed`, values
-1-64 characters without `, = { }`. They say which thing a number or check is about.
+**Link:** `title` (at most 100) and `url` (`http(s)://`, at most 500).
 
-Unknown fields are rejected, so a typo fails loudly instead of disappearing. A document
-is at most 256 KiB. **Never put secrets in a feed**: feeds are status, not storage.
+**Times** are RFC 3339 strings; **durations** are like `90s`, `5m`, `26h`, `1h30m`.
 
-## How hubs present feeds
+Unknown fields are rejected by beacon, so a typo fails loudly; hubs ignore fields they
+don't know. **Never put secrets in anything beacon serves.**
 
-This is the contract that lets a producer get a good display without designing one.
-lookout follows it; another hub should too.
-
-- **Headline numbers.** Metrics with `"primary": true` (at most 6) are the feed's headline:
-  shown as stat tiles with a trend line, on the overview and on the feed's page, in the
-  order given. With none marked, the first unlabelled metrics stand in.
-- **Other unlabelled metrics** are shown as further stat tiles on the feed's page.
-- **Tables from labels.** Metrics with labels are grouped by their label *names*. Each
-  group is a table: one row per distinct label value combination (in order of first
-  appearance), one column per metric key (header = the metric's `label`, else the key).
-  Checks with the same label names join that table as a status column, matched by label
-  values. So `records.total{endpoint=…}`, `records.new{endpoint=…}` and a check
-  `healthy{endpoint=…}` become one "by endpoint" table with a status per row. Keep a
-  key's `label` the same across rows: it's the column header.
-- **Checks without labels** are listed on their own, problems first.
-- **Units format the number:** `count` (thousands separators, compact in tiles), `percent`
-  (0-100), `bytes`, `s`/`ms` (durations); anything else is shown after the value.
-  No unit: a plain number.
-- **History:** every metric (each key+labels series) gets a trend line from the values the
-  hub saw. A metric whose meaning changes should get a new key.
-- **Status:** the feed's own `status`, except **stale** (above), which the hub derives.
-
-Write titles and labels in sentence case without the feed's name in them (`New`, not
-`Centric: new records`): the hub shows them in the feed's context.
-
-## Status semantics
-
-- `ok`: working as intended.
-- `warn`: working, but someone should look (disk filling, a slow run, one endpoint failing).
-- `fail`: not working (job failed, service down).
-- `unknown`: the producer can't tell (e.g. a dependency it asks is unavailable).
-
-## Reading feeds: beacon's HTTP API
-
-`beacon serve` listens on `127.0.0.1:7600` by default (in tunnel mode on the box's private
-tunnel address) and serves only the feeds folder, read-only. Every request except
-`/healthz` needs `Authorization: Bearer <token>` (tokens: `beacon token add <name>`).
-
-| Request | Response |
-|---|---|
-| `GET /v1/feeds` | All feeds in one document (below). Carries an `ETag`; send `If-None-Match` to get `304` when nothing changed |
-| `GET /v1/feeds/<feed>` | One feed document |
-| `GET /healthz` | `ok` (no token needed; says nothing about feeds) |
-
-Anything else is `404`, any method but `GET`/`HEAD` is `405`.
+## Component (state)
 
 ```json
 {
-  "schema": 1,
-  "source": "web-1",
-  "beacon": "v0.3.0",
-  "generated_at": "2026-10-22T01:02:00Z",
-  "feeds": [ { "schema": 1, "feed": "host", "...": "..." } ],
-  "invalid": [ { "file": "broken.json", "error": "status: must be ok, warn, fail or unknown" } ]
+  "id": "centric-fetch",
+  "title": "Centric fetch",
+  "group": "Integrations",
+  "description": "Pulls 12 Centric PLM endpoints into SQLite.",
+  "updated_at": "2026-10-22T11:02:00Z",
+  "expect_every": "10m",
+  "schedule": { "next_at": "2026-10-23T01:00:00Z", "grace": "1h", "every": "Mon–Sat 01:00 UTC" },
+  "running": { "id": "4f1c…", "started_at": "2026-10-22T01:00:02Z", "trigger": "timer" },
+  "status": "ok",
+  "summary": "12 endpoints, 364,972 records",
+  "gauges": [ { "key": "records", "label": "Records", "value": 30538, "unit": "count", "labels": { "endpoint": "styles" } } ],
+  "checks": [ { "name": "healthy", "status": "ok", "labels": { "endpoint": "styles" } } ],
+  "links": [ { "title": "Files", "url": "https://example.com/files/" } ]
 }
 ```
 
-`invalid` lists files in the folder that aren't valid feeds, so a broken producer shows
-up on the hub instead of silently vanishing. Only regular `*.json` files directly in the
-folder are read: no subfolders, no symlinks, nothing else on the box.
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | `[a-z0-9][a-z0-9._-]*`, at most 64; stable |
+| `title` | no | display name (at most 100) |
+| `group` | no | a heading to group components under (at most 50), e.g. `Integrations`, `System` |
+| `description` | no | one sentence: what it is (at most 300) |
+| `updated_at` | yes | when this state was written |
+| `expect_every` | no | longest normal gap between state updates; past it the state is **stale** |
+| `schedule` | no | for components that run on a schedule: `next_at` (the next expected start), `grace` (how late a start may be before it counts as **missed**, default `1h`), `every` (human description) |
+| `running` | no | a run in progress: `id`, `started_at`, `trigger` |
+| `status`, `summary` | no | the producer's own verdict (`ok`/`warn`/`fail`/`unknown`) and one line (at most 500) about the state |
+| `gauges` | no | at most 100 metrics: values now |
+| `checks` | no | at most 50 |
+| `links` | no | at most 10 |
+
+## Log entries
+
+Every entry has `seq` (a positive integer, increasing by one per entry on this box, never
+reused) and `type`.
+
+**Run** (written when the run ends):
+
+```json
+{
+  "seq": 812, "type": "run", "component": "centric-fetch", "id": "4f1c…",
+  "started_at": "2026-10-22T01:00:02Z", "ended_at": "2026-10-22T01:02:06Z",
+  "outcome": "success", "trigger": "timer", "exit_code": 0, "unit": "centric-api-fetch.service",
+  "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+  "stats": [
+    { "key": "records.new", "label": "New records", "value": 697, "unit": "count", "primary": true },
+    { "key": "records.new", "label": "New", "value": 17, "unit": "count", "labels": { "endpoint": "styles" } }
+  ],
+  "error": null,
+  "artifacts": [ { "title": "Report", "url": "https://example.com/report.xlsx" } ]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `component` | yes | the component's `id` |
+| `id` | yes | unique per box (systemd's InvocationID, or a random id), at most 64 |
+| `started_at`, `ended_at` | yes | |
+| `outcome` | yes | `success`, `failure` or `cancelled` (stopped from outside) |
+| `trigger` | no | `timer`, `manual`, `boot`, `dependency`, `other` |
+| `exit_code` | no | the process's exit status |
+| `unit` | no | the systemd unit or command that ran |
+| `summary` | no | one line (at most 500) |
+| `stats` | no | at most 100 metrics: what the run produced |
+| `error` | no | why it failed, at most 2000 characters (the end of its output if nothing better) |
+| `artifacts` | no | at most 10 links: what it made |
+
+**Event:**
+
+```json
+{ "seq": 813, "type": "event", "id": "b7…", "at": "2026-10-22T00:00:41Z", "kind": "reboot",
+  "component": null, "title": "Rebooted", "detail": "kernel 6.8.0-146 → 6.8.0-147" }
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | unique per box, at most 64 |
+| `at` | yes | |
+| `kind` | yes | `reboot`, `deploy`, `config`, `note` |
+| `component` | no | the component it's about, or null for the whole box |
+| `title` | yes | at most 200 |
+| `detail` | no | at most 2000 |
+
+The box keeps the log for 90 days (at most 20,000 entries).
+
+## HTTP API
+
+`beacon serve` listens on `127.0.0.1:7600` (in tunnel mode on the box's private tunnel
+address). Every request except `/healthz` needs `Authorization: Bearer <token>`; only
+`GET`/`HEAD` are answered.
+
+**`GET /v2/state`** (with `ETag`; `If-None-Match` → `304`):
+
+```json
+{
+  "schema": 2,
+  "source": "ysera",
+  "beacon": "v2.0.0",
+  "generated_at": "2026-10-22T11:02:10Z",
+  "box": { "os": "Ubuntu 24.04.5 LTS", "kernel": "6.8.0-147-generic", "arch": "amd64",
+           "boot_at": "2026-10-22T00:00:30Z" },
+  "log": { "first_seq": 1, "last_seq": 813 },
+  "components": [ { "id": "host", "...": "..." } ],
+  "invalid": [ { "file": "broken.json", "error": "…" } ]
+}
+```
+
+**`GET /v2/log?after=<seq>&limit=<n>`**: entries with `seq > after`, oldest first, at most
+`limit` (default and maximum 500):
+
+```json
+{ "entries": [ { "seq": 812, "type": "run", "...": "..." } ], "first_seq": 1, "last_seq": 813 }
+```
+
+A hub keeps the last `seq` it stored and asks for more while `last_seq` is ahead. If its
+`after` is older than `first_seq - 1`, entries were pruned before it saw them (a gap it
+can note).
+
+`GET /healthz` → `ok`. Anything else is `404`.
+
+## How a hub presents it (what producers can rely on)
+
+- **Status per component**, worst of: latest run failed (until a later run succeeds) ·
+  **missed** (`schedule.next_at + grace` passed with no run started) · a check failing or
+  warning · **stale** state · the producer's `status`. Always shown with its reason.
+- **Headline numbers**: `primary` metrics (stats of the latest run first, then gauges), as
+  tiles; with none marked, the first unlabelled ones.
+- **Tables from labels**: metrics with labels group by label *names* into a table: a row per
+  label value, a column per key (header = its `label`); checks with the same labels become
+  that table's status column.
+- **History**: run stats chart one point per run, compared with the median of earlier runs
+  ("3× usual"); gauges chart over time.
+- **Units** decide formatting everywhere; `links` and `artifacts` become buttons.
+- **Group** headings order the components; within a box, problems first.
 
 ## Versioning
 
-`schema` changes only for changes that would break a reader. New optional fields can be
-added within schema 1; hubs ignore fields they don't know when reading (beacon itself
-rejects them when writing, so producers stay on the documented set). Removed in v0.3.0:
-`visibility` (lookout has no public page; everything is behind its login).
+`schema` changes only when a reader would break. New optional fields may appear within
+schema 2. v1 (`/v1/feeds`, feed documents) was replaced by this in beacon v2.0.0.

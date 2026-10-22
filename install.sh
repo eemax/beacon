@@ -13,7 +13,7 @@
 #                         from the hub's `lookout source tunnel <box>`). beacon listens there;
 #                         it's added to lo and never routed off the box
 #
-# Idempotent: re-run to update. Never touches existing feeds, tokens or collectors.
+# Idempotent: re-run to update. Never touches tokens, component definitions or the log.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,9 +69,18 @@ changed=0; [[ "$before" != "$(sha256sum /usr/local/bin/beacon | cut -d' ' -f1)" 
 step "user, folders, config"
 id beacon &>/dev/null \
   || useradd --system --user-group --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin beacon
-install -d -m 755 /var/lib/beacon /var/lib/beacon/feeds     # root writes feeds, beacon reads
+# root writes (collect, exec, event), beacon reads (serve).
+install -d -m 755 /var/lib/beacon /var/lib/beacon/components
 install -d -m 750 -g beacon /etc/beacon
-install -d -m 755 /etc/beacon/collectors.d                  # root's: collectors run as root
+install -d -m 755 /etc/beacon/components.d                  # root's: adapters run as root
+rm -rf /var/lib/beacon/feeds                                # v0.x, generated
+if [[ -d /etc/beacon/collectors.d ]]; then
+  if [[ -n "$(ls -A /etc/beacon/collectors.d)" ]]; then
+    echo "note: /etc/beacon/collectors.d (v0.x) is ignored now: describe those as components.d/<id>.json"
+  else
+    rmdir /etc/beacon/collectors.d
+  fi
+fi
 if [[ ! -f /etc/beacon/tokens ]]; then
   printf '# beacon tokens: <name> <sha256 of the token>. Manage with `beacon token`.\n' > /etc/beacon/tokens
 fi

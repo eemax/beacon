@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- beacon serve on the tunnel address (from `lookout source tunnel <box>`): replace
+     10.249.0.X below. The address is added to lo0 first; nothing routes to it from outside.
+     Runs as root (no systemd sandbox here); serve is read-only either way. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>xyz.beacon.serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string><string>-c</string>
+    <string>/sbin/ifconfig lo0 alias 10.249.0.X/32 &amp;&amp; exec /usr/local/bin/beacon serve --listen 10.249.0.X:7600</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardErrorPath</key><string>/var/log/beacon-serve.log</string>
+</dict>
+</plist>

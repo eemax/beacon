@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- beacon collect every minute, as root (/Library/LaunchDaemons). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>xyz.beacon.collect</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/beacon</string><string>collect</string></array>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>LowPriorityIO</key><true/>
+  <key>Nice</key><integer>10</integer>
+  <key>StandardErrorPath</key><string>/var/log/beacon-collect.log</string>
+</dict>
+</plist>

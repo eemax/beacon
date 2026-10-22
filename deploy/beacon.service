@@ -1,5 +1,5 @@
 [Unit]
-Description=beacon: serve status feeds, read-only (127.0.0.1:7600)
+Description=beacon: serve components and the run log, read-only (127.0.0.1:7600)
 Documentation=https://github.com/eemax/beacon
 After=network.target
 
@@ -11,7 +11,7 @@ Group=beacon
 Restart=on-failure
 RestartSec=5
 
-# It only reads the feeds folder and the tokens file, and only talks HTTP.
+# It only reads /var/lib/beacon and /etc/beacon, and only talks HTTP.
 ProtectSystem=strict
 ReadOnlyPaths=/var/lib/beacon /etc/beacon
 ProtectHome=yes

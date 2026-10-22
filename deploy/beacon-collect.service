@@ -1,14 +1,14 @@
 [Unit]
-Description=beacon: write the host feed and run /etc/beacon/collectors.d/*
+Description=beacon: update components, log new runs (/etc/beacon/components.d)
 Documentation=https://github.com/eemax/beacon
 
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/beacon/beacon.env
-# Runs as root: collectors often need to read root-only state (databases, logs).
-# Only root can add collectors (/etc/beacon/collectors.d is root's).
-# "-": a failing collector is reported in its own feed (status fail); it shouldn't also
-# leave this unit failed every minute.
+# Runs as root: it reads systemd and the journal, and adapters often need root-only
+# state (databases, logs). Only root can add definitions (/etc/beacon/components.d).
+# "-": a failing adapter is reported in its own component (status fail); it shouldn't
+# also leave this unit failed every minute.
 ExecStart=-/usr/local/bin/beacon collect
 Nice=10
 TimeoutStartSec=5min

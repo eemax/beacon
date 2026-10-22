@@ -1,18 +1,16 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package host
 
 import (
 	"errors"
-	"time"
-
-	"github.com/eemax/beacon/internal/feed"
+	"runtime"
 )
 
-// Supported reports whether this platform has a host collector.
 const Supported = false
 
-// Feed is only implemented on Linux.
-func Feed(root string, now time.Time) (*feed.Feed, error) {
-	return nil, errors.New("the host collector is only available on Linux")
+func read() (sample, error) {
+	return sample{}, errors.New("the host component is only available on Linux and macOS")
 }
+
+func ReadFacts() Facts { return Facts{Arch: runtime.GOARCH} }

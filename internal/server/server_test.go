@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,33 +13,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eemax/beacon/internal/feed"
+	"github.com/eemax/beacon/internal/logbook"
+	"github.com/eemax/beacon/internal/spec"
 	"github.com/eemax/beacon/internal/tokens"
 )
 
 func setup(t *testing.T) (*httptest.Server, string, string) {
 	t.Helper()
 	dir := t.TempDir()
-	feeds := filepath.Join(dir, "feeds")
-	os.Mkdir(feeds, 0o755)
-	tokensPath := filepath.Join(dir, "tokens")
-	token, err := tokens.Add(tokensPath, "lookout")
+	comps := filepath.Join(dir, "components")
+	os.Mkdir(comps, 0o755)
+	tok, err := tokens.Add(filepath.Join(dir, "tokens"), "lookout")
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &feed.Feed{Schema: 1, Feed: "host", Status: feed.OK, UpdatedAt: time.Unix(1792600000, 0).UTC()}
-	if err := feed.Write(feeds, f); err != nil {
-		t.Fatal(err)
+	spec.WriteComponent(comps, &spec.Component{ID: "host", UpdatedAt: time.Now().UTC().Truncate(time.Second)})
+	os.WriteFile(filepath.Join(comps, "broken.json"), []byte("{"), 0o644)
+	l := logbook.Log{Path: filepath.Join(dir, "log.jsonl")}
+	for i := 0; i < 3; i++ {
+		l.Append(&spec.Event{Type: "event", ID: fmt.Sprintf("e%d", i), At: time.Now().UTC(), Kind: "note", Title: "n"})
 	}
-	os.WriteFile(filepath.Join(feeds, "broken.json"), []byte("{"), 0o644)
-	os.WriteFile(filepath.Join(dir, "secret.json"), []byte(`{"schema":1}`), 0o644)
-	srv := &Server{
-		Dir: feeds, Source: "test", Version: "test", Tokens: tokens.Open(tokensPath),
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now,
-	}
+	srv := &Server{Components: comps, Definitions: filepath.Join(dir, "components.d"), LogPath: l.Path, Source: "test", Version: "test",
+		Tokens: tokens.Open(filepath.Join(dir, "tokens")), Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now}
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	return ts, token, feeds
+	return ts, tok, dir
 }
 
 func get(t *testing.T, url, token string, header ...string) *http.Response {
@@ -58,73 +57,50 @@ func get(t *testing.T, url, token string, header ...string) *http.Response {
 	return resp
 }
 
-func TestListingNeedsAToken(t *testing.T) {
-	ts, token, _ := setup(t)
-	if resp := get(t, ts.URL+"/v1/feeds", ""); resp.StatusCode != 401 {
-		t.Fatalf("no token: %d", resp.StatusCode)
+func TestState(t *testing.T) {
+	ts, tok, _ := setup(t)
+	if r := get(t, ts.URL+"/v2/state", ""); r.StatusCode != 401 {
+		t.Fatalf("no token: %d", r.StatusCode)
 	}
-	if resp := get(t, ts.URL+"/v1/feeds", "bcn_wrong"); resp.StatusCode != 401 {
-		t.Fatalf("wrong token: %d", resp.StatusCode)
+	r := get(t, ts.URL+"/v2/state", tok)
+	var body state
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Schema != 2 || len(body.Components) != 1 || len(body.Invalid) != 1 || body.Log.First != 1 || body.Log.Last != 3 || body.Box.Arch == "" {
+		t.Fatalf("state = %+v", body)
 	}
-	resp := get(t, ts.URL+"/v1/feeds", token)
-	if resp.StatusCode != 200 {
-		t.Fatalf("good token: %d", resp.StatusCode)
-	}
-	var body listing
-	json.NewDecoder(resp.Body).Decode(&body)
-	if body.Source != "test" || len(body.Feeds) != 1 || body.Feeds[0].Feed != "host" {
-		t.Fatalf("listing = %+v", body)
-	}
-	if len(body.Invalid) != 1 || body.Invalid[0].File != "broken.json" {
-		t.Fatalf("invalid = %+v", body.Invalid)
+	etag := r.Header.Get("ETag")
+	if r := get(t, ts.URL+"/v2/state", tok, "If-None-Match", etag); r.StatusCode != 304 {
+		t.Fatalf("unchanged: %d", r.StatusCode)
 	}
 }
 
-func TestETagGives304UntilAFeedChanges(t *testing.T) {
-	ts, token, feeds := setup(t)
-	etag := get(t, ts.URL+"/v1/feeds", token).Header.Get("ETag")
-	if etag == "" {
-		t.Fatal("no ETag")
+func TestLog(t *testing.T) {
+	ts, tok, _ := setup(t)
+	r := get(t, ts.URL+"/v2/log?after=1&limit=1", tok)
+	var body struct {
+		Entries []map[string]any `json:"entries"`
+		First   int64            `json:"first_seq"`
+		Last    int64            `json:"last_seq"`
 	}
-	if resp := get(t, ts.URL+"/v1/feeds", token, "If-None-Match", etag); resp.StatusCode != 304 {
-		t.Fatalf("unchanged: %d, want 304", resp.StatusCode)
+	json.NewDecoder(r.Body).Decode(&body)
+	if len(body.Entries) != 1 || body.Entries[0]["seq"].(float64) != 2 || body.Last != 3 {
+		t.Fatalf("log = %+v", body)
 	}
-	feed.Write(feeds, &feed.Feed{Schema: 1, Feed: "host", Status: feed.Warn, UpdatedAt: time.Now().UTC()})
-	if resp := get(t, ts.URL+"/v1/feeds", token, "If-None-Match", etag); resp.StatusCode != 200 {
-		t.Fatalf("changed: %d, want 200", resp.StatusCode)
-	}
-}
-
-func TestOneFeed(t *testing.T) {
-	ts, token, _ := setup(t)
-	if resp := get(t, ts.URL+"/v1/feeds/host", token); resp.StatusCode != 200 {
-		t.Fatalf("host: %d", resp.StatusCode)
-	}
-	if resp := get(t, ts.URL+"/v1/feeds/broken", token); resp.StatusCode != 422 {
-		t.Fatalf("broken: %d", resp.StatusCode)
-	}
-	for _, path := range []string{"/v1/feeds/nope", "/v1/feeds/..%2Fsecret", "/v1/feeds/%2e%2e", "/v1/feeds/host.json", "/secret.json", "/"} {
-		if resp := get(t, ts.URL+path, token); resp.StatusCode != 404 {
-			t.Errorf("%s: %d, want 404", path, resp.StatusCode)
-		}
-	}
-}
-
-func TestReadOnlyAndHealthz(t *testing.T) {
-	ts, token, _ := setup(t)
-	for _, method := range []string{"POST", "PUT", "DELETE", "PATCH"} {
-		req, _ := http.NewRequest(method, ts.URL+"/v1/feeds/host", strings.NewReader("{}"))
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, method := range []string{"POST", "PUT", "DELETE"} {
+		req, _ := http.NewRequest(method, ts.URL+"/v2/log", strings.NewReader("{}"))
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, _ := http.DefaultClient.Do(req)
 		resp.Body.Close()
 		if resp.StatusCode != 405 {
-			t.Errorf("%s: %d, want 405", method, resp.StatusCode)
+			t.Errorf("%s: %d", method, resp.StatusCode)
 		}
 	}
-	if resp := get(t, ts.URL+"/healthz", ""); resp.StatusCode != 200 {
-		t.Fatalf("healthz: %d", resp.StatusCode)
+	for _, path := range []string{"/v1/feeds", "/v2/state/../tokens", "/"} {
+		if r := get(t, ts.URL+path, tok); r.StatusCode != 404 {
+			t.Errorf("%s: %d", path, r.StatusCode)
+		}
+	}
+	if r := get(t, ts.URL+"/healthz", ""); r.StatusCode != 200 {
+		t.Fatal("healthz")
 	}
 }
