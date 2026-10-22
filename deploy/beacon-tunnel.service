@@ -1,0 +1,20 @@
+[Unit]
+Description=beacon: Cloudflare Tunnel, so the hub reaches beacon with no inbound port
+Documentation=https://github.com/eemax/beacon
+After=network-online.target beacon.service
+Wants=network-online.target
+
+[Service]
+# The tunnel token comes from the hub (`lookout source add`), root-only on disk.
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --protocol quic run --token-file ${CREDENTIALS_DIRECTORY}/tunnel.token
+Restart=always
+RestartSec=5
+DynamicUser=yes
+LoadCredential=tunnel.token:/etc/beacon/tunnel.token
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

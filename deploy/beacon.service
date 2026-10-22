@@ -1,0 +1,39 @@
+[Unit]
+Description=beacon: serve status feeds, read-only (127.0.0.1:7600)
+Documentation=https://github.com/eemax/beacon
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/beacon/beacon.env
+ExecStart=/usr/local/bin/beacon serve
+User=beacon
+Group=beacon
+Restart=on-failure
+RestartSec=5
+
+# It only reads the feeds folder and the tokens file, and only talks HTTP.
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/beacon /etc/beacon
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
