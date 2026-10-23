@@ -12,6 +12,8 @@ A hub ([lookout](https://github.com/eemax/lookout)) reads both over beacon's rea
 API: the state on every poll, the log from where it left off, so it sees every run exactly
 once. The design behind this is lookout's `docs/design.md`.
 
+For people and agents building apps: [APPS.md](APPS.md) (what to expose, which numbers).
+
 **Producers describe, hubs present.** Nothing here says how to draw anything; it says what
 things are (units, labels, headline numbers, outcomes, schedules), and the hub derives the
 display from that the same way for every component.

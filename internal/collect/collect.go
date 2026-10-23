@@ -73,6 +73,9 @@ func (d *Definition) validate(file string) error {
 	if !spec.ValidName(d.ID) || d.ID+".json" != file {
 		return fmt.Errorf("id %q must be a valid id and match the file name", d.ID)
 	}
+	if d.ID == "host" {
+		return errors.New(`id "host" is beacon's built-in component`)
+	}
 	if d.Systemd != nil && len(d.Systemd.Units) == 0 {
 		return errors.New("systemd.units: required")
 	}
@@ -84,7 +87,13 @@ func (d *Definition) validate(file string) error {
 			return fmt.Errorf("schedule.interval: %w", err)
 		}
 	}
-	return nil
+	// What the definition puts into the component (title, expect_every, schedule) must be
+	// valid there, or every collect would fail to write it.
+	c := spec.Component{ID: d.ID, Title: d.Title, Group: d.Group, Description: d.Description, UpdatedAt: time.Unix(1, 0), ExpectEvery: d.ExpectEvery}
+	if d.Schedule != nil {
+		c.Schedule = &spec.Schedule{Grace: d.Schedule.Grace, Every: d.Schedule.Every}
+	}
+	return c.Validate()
 }
 
 // Definitions reads components.d; a broken file is reported, not fatal.
@@ -119,10 +128,13 @@ func NewID() string {
 	return hex.EncodeToString(b)
 }
 
-// Result is what one collect did, for the command's output.
+// Result is what one collect did, for the command's output: Lines are what changed (runs,
+// events, removals, failures), Updated the components written (quiet unless asked: collect
+// runs every minute and the journal shouldn't fill with "nothing happened").
 type Result struct {
-	Lines  []string
-	Failed int
+	Lines   []string
+	Updated []string
+	Failed  int
 }
 
 func (r *Result) ok(format string, args ...any) {
@@ -177,7 +189,7 @@ func Run(ctx context.Context, cfg Config) (*Result, error) {
 		if err != nil {
 			res.fail("host: %v", err)
 		} else {
-			res.ok("host")
+			res.Updated = append(res.Updated, "host")
 		}
 	}
 
@@ -191,14 +203,18 @@ func Run(ctx context.Context, cfg Config) (*Result, error) {
 		timers, _ = systemd.Timers()
 	}
 
-	// Runs of `beacon exec` whose process is gone (killed with the box, OOM, …).
+	// Runs of `beacon exec` whose process is gone (killed with the box, OOM, …). A marker
+	// from before this boot is gone even if its pid has been reused since.
 	st, _ := statefile.Read(cfg.State)
 	for id, m := range st.Running {
-		if m.PID > 0 && syscall.Kill(m.PID, 0) != nil {
+		beforeBoot := !facts.BootAt.IsZero() && m.StartedAt.Before(facts.BootAt.Add(-time.Minute))
+		if beforeBoot || (m.PID > 0 && syscall.Kill(m.PID, 0) != nil) {
 			run := &spec.Run{Type: "run", Component: m.Component, ID: id, StartedAt: m.StartedAt, EndedAt: now, Outcome: spec.Failure, Trigger: m.Trigger,
 				Error: "the process ended without beacon recording it (killed, or the box went down)"}
 			if err := FinishRun(ctx, cfg, defs[m.Component], run); err != nil {
 				res.fail("%s: %v", m.Component, err)
+			} else {
+				res.ok("%s: run %s (failure: its process vanished)", m.Component, id)
 			}
 		}
 	}
@@ -299,9 +315,12 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 	// systemd: new invocations become runs; one in progress becomes `running`.
 	if d.Systemd != nil {
 		if !systemd.Supported {
-			return errors.New("systemd units listed, but systemd isn't available here")
+			notes = append(notes, "systemd units listed, but systemd isn't available here")
 		}
 		for _, name := range d.Systemd.Units {
+			if !systemd.Supported {
+				break
+			}
 			u, err := systemd.Show(name)
 			if err != nil {
 				notes = append(notes, err.Error())
@@ -344,13 +363,22 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 				s.Grace = d.Schedule.Grace
 			}
 		}
-		if d.Systemd != nil {
-			for _, t := range timers {
-				for _, want := range d.Systemd.Timers {
-					if t.Unit == want && !t.Next.IsZero() && (s.NextAt == nil || t.Next.Before(*s.NextAt)) {
-						next := t.Next
-						s.NextAt = &next
+		if d.Systemd != nil && systemd.Supported {
+			for _, want := range d.Systemd.Timers {
+				scheduled := false
+				for _, t := range timers {
+					if t.Unit == want && !t.Next.IsZero() {
+						scheduled = true
+						if s.NextAt == nil || t.Next.Before(*s.NextAt) {
+							next := t.Next
+							s.NextAt = &next
+						}
 					}
+				}
+				// Without this, a stopped or disabled timer would just make the schedule
+				// disappear, and with it the hub's "missed".
+				if !scheduled {
+					notes = append(notes, want+" isn't scheduled (stopped, disabled or missing): no next run")
 				}
 			}
 		}
@@ -371,19 +399,27 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 		if err == nil {
 			err = spec.Decode(out, &so)
 		}
+		if err == nil {
+			// Validate the adapter's part on its own, so a bad document reads as the
+			// adapter's fault (with the reason) instead of leaving the component unwritten.
+			err = (&spec.Component{ID: d.ID, UpdatedAt: now, Status: so.Status, Summary: so.Summary, Gauges: so.Gauges, Checks: so.Checks, Links: so.Links}).Validate()
+		}
 		if err != nil {
-			c.Status, c.Summary = spec.Fail, truncate("state adapter failed: "+err.Error(), 500)
+			c.Status, c.Summary = spec.Fail, truncate("state adapter failed: "+oneLine(err.Error()), 500)
 		} else {
 			c.Status, c.Summary, c.Gauges, c.Checks, c.Links = so.Status, so.Summary, so.Gauges, so.Checks, so.Links
 		}
 	}
-	if len(notes) > 0 && c.Status != spec.Fail {
+	if msg := st.RunAdapter[d.ID]; msg != "" {
+		notes = append(notes, "last run logged without its stats: "+msg)
+	}
+	if len(notes) > 0 && len(c.Checks) < 50 {
 		c.Checks = append(c.Checks, spec.Check{Name: "beacon", Status: spec.Warn, Detail: truncate(strings.Join(notes, "; "), 500)})
 	}
 	if err := spec.WriteComponent(cfg.Components, c); err != nil {
 		return err
 	}
-	res.ok("%s", d.ID)
+	res.Updated = append(res.Updated, d.ID)
 	return nil
 }
 
@@ -442,6 +478,7 @@ func runFromUnit(d *Definition, u systemd.Unit, timers []systemd.Timer) *spec.Ru
 
 // FinishRun adds the run adapter's stats to a finished run and logs it.
 func FinishRun(ctx context.Context, cfg Config, d *Definition, run *spec.Run) error {
+	adapterErr := "-" // "-": no adapter ran, keep what's recorded
 	if d != nil && d.Run != "" {
 		exit := ""
 		if run.ExitCode != nil {
@@ -462,16 +499,24 @@ func FinishRun(ctx context.Context, cfg Config, d *Definition, run *spec.Run) er
 		if err == nil {
 			err = spec.Decode(out, &extra)
 		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: run adapter: %v\n", run.Component, err)
-		} else {
+		if err == nil {
+			// Checked on a copy: a bad adapter document must never cost the run itself.
+			merged := *run
 			if extra.Summary != "" {
-				run.Summary = truncate(extra.Summary, 500)
+				merged.Summary = truncate(extra.Summary, 500)
 			}
-			run.Stats, run.Artifacts = extra.Stats, extra.Artifacts
+			merged.Stats, merged.Artifacts = extra.Stats, extra.Artifacts
 			if extra.Error != "" {
-				run.Error = truncate(extra.Error, 2000)
+				merged.Error = truncate(extra.Error, 2000)
 			}
+			if err = merged.Validate(); err == nil {
+				*run = merged
+			}
+		}
+		adapterErr = ""
+		if err != nil {
+			adapterErr = truncate(oneLine(err.Error()), 300)
+			fmt.Fprintf(os.Stderr, "%s: run adapter: %s\n", run.Component, adapterErr)
 		}
 	}
 	if _, err := (logbook.Log{Path: cfg.Log}).Append(run); err != nil {
@@ -479,6 +524,16 @@ func FinishRun(ctx context.Context, cfg Config, d *Definition, run *spec.Run) er
 	}
 	return statefile.Update(cfg.State, func(s *statefile.State) error {
 		delete(s.Running, run.ID)
+		if adapterErr != "-" {
+			if s.RunAdapter == nil {
+				s.RunAdapter = map[string]string{}
+			}
+			if adapterErr == "" {
+				delete(s.RunAdapter, run.Component)
+			} else {
+				s.RunAdapter[run.Component] = adapterErr
+			}
+		}
 		if s.LastStart == nil {
 			s.LastStart = map[string]time.Time{}
 		}
@@ -512,6 +567,9 @@ func runCommand(ctx context.Context, path string, env []string, timeout time.Dur
 	}
 	return stdout.Bytes(), nil
 }
+
+// oneLine joins a multi-line error (errors.Join) into one line.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // lastLines keeps the end of s, at most max bytes, starting at a line break.
 func lastLines(s string, max int) string {

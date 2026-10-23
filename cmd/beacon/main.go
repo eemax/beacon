@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -144,6 +146,7 @@ func (r *repeated) Set(v string) error { *r = append(*r, v); return nil }
 func cmdCollect(args []string) error {
 	fs, p := newFlags("collect")
 	timeout := fs.Duration("timeout", 30*time.Second, "time limit per adapter")
+	verbose := fs.Bool("v", false, "also list the components written")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -153,6 +156,9 @@ func cmdCollect(args []string) error {
 	}
 	for _, line := range res.Lines {
 		fmt.Println(line)
+	}
+	if *verbose {
+		fmt.Println("updated:", strings.Join(res.Updated, " "))
 	}
 	if res.Failed > 0 {
 		return fmt.Errorf("%d problem(s)", res.Failed)
@@ -238,7 +244,7 @@ func cmdExec(args []string) error {
 	wasStopped := len(stopped) > 0
 
 	run := &spec.Run{Type: "run", Component: component, ID: id, StartedAt: start, EndedAt: time.Now().UTC().Truncate(time.Second),
-		Trigger: *trigger, Unit: truncate(strings.Join(argv, " "), 200)}
+		Trigger: *trigger, Unit: truncate(filepath.Base(argv[0]), 200)} // not the arguments: they may hold secrets
 	code := 0
 	var exitErr *exec.ExitError
 	switch {
@@ -609,7 +615,7 @@ func cmdValidate(args []string) error {
 		fmt.Printf("ok   component %s\n", c.ID)
 	}
 	defs, defInvalid := collect.Definitions(p.definitions())
-	for id := range defs {
+	for _, id := range slices.Sorted(maps.Keys(defs)) {
 		fmt.Printf("ok   definition %s\n", id)
 	}
 	for _, i := range append(invalid, defInvalid...) {

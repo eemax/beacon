@@ -22,7 +22,9 @@ needs no credentials for anything outside itself and accepts no writes from outs
                                                                          lookout
 ```
 
-The data model and the HTTP API are in [SPEC.md](SPEC.md).
+The data model and the HTTP API are in [SPEC.md](SPEC.md). **Building an app?**
+[APPS.md](APPS.md) says what it should expose and which numbers to report (point your AI
+agent at it).
 
 ## Describing a component
 
@@ -75,8 +77,11 @@ arguments, run as root, 30 s limit) that prints one JSON object:
 - the **state adapter** prints what the component is now:
   `{"status", "summary", "gauges": [Metric], "checks": [Check], "links": [Link]}`.
 
-Every field is optional. Shapes are in SPEC.md. A failing state adapter turns the
-component `fail` with the reason; a failing run adapter leaves the run as systemd saw it.
+Every field is optional. Shapes are in SPEC.md. beacon checks what adapters print: a
+failing or invalid state adapter turns the component `fail` with the reason; a failing or
+invalid run adapter never costs the run (it's logged as systemd saw it, and the component
+warns until the adapter works again). A timer listed in the definition that isn't
+scheduled (stopped, disabled) is a warning too, since without it nothing can be missed.
 
 Adapters describe, the hub presents (SPEC.md → How a hub presents it): mark the headline
 numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that
@@ -87,7 +92,8 @@ with a row per thing, without any display code anywhere.
 
 Wrap them in `beacon exec`, from launchd, cron or by hand. It runs the command as it
 would have run (output, exit code and signals pass through) and logs the run, with the
-output's tail as the error when it fails:
+output's tail as the error when it fails (the run's `unit` is the command's name, never its
+arguments):
 
 ```bash
 beacon exec backup --trigger timer -- /usr/local/bin/backup.sh --full
@@ -160,7 +166,7 @@ Wrap launchd jobs in `beacon exec` (in their `ProgramArguments`) to log their ru
 ## Commands
 
 ```
-beacon collect                         update components and log new runs (every minute)
+beacon collect [-v]                    update components and log new runs (every minute)
 beacon exec <component> [--trigger T] -- <command> [args]
 beacon event deploy|config|note --title T [--component C] [--detail D]
 beacon run <component> --json FILE|-   log a finished run from a JSON document

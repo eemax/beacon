@@ -1,7 +1,8 @@
 # beacon
 
 Go, stdlib only. Components, runs and events on a box (SPEC.md), served read-only to the lookout hub.
-README.md has the overview.
+README.md has the overview; APPS.md is the guide for apps (what to expose); keep it in
+step with SPEC.md and lookout's display rules.
 
 - Develop and release from a checkout; boxes install release binaries
   (`install.sh`), never by building on the box.

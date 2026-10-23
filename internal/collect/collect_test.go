@@ -165,3 +165,57 @@ func TestExecOnlyComponent(t *testing.T) {
 		t.Fatal("old LastStart not pruned")
 	}
 }
+
+func TestBadAdapterOutputNeverCostsTheRun(t *testing.T) {
+	cfg := config(t)
+	// Valid JSON, invalid stats (bad key, NaN-free but a duplicate): the run must still be
+	// logged, without the adapter's part, and the component must say why.
+	badRun := script(t, cfg.Definitions, "x.run", `echo '{"summary":"ok","stats":[{"key":"Bad Key","value":1}]}'`)
+	badState := script(t, cfg.Definitions, "x.state", `echo '{"status":"ok","gauges":[{"key":"a","value":1},{"key":"a","value":2}]}'`)
+	data, _ := json.Marshal(map[string]any{"id": "x", "run": badRun, "state": badState})
+	os.WriteFile(filepath.Join(cfg.Definitions, "x.json"), data, 0o644)
+	defs, _ := Definitions(cfg.Definitions)
+	now := time.Now().UTC().Truncate(time.Second)
+	code := 0
+	run := &spec.Run{Type: "run", Component: "x", ID: "r1", StartedAt: now.Add(-time.Minute), EndedAt: now, Outcome: spec.Success, ExitCode: &code}
+	if err := FinishRun(context.Background(), cfg, defs["x"], run); err != nil {
+		t.Fatalf("run lost: %v", err)
+	}
+	entries, _, _, _ := logbook.Log{Path: cfg.Log}.Read(0, 10)
+	if len(entries) != 1 || strings.Contains(string(entries[0]), "Bad Key") {
+		t.Fatalf("log = %s", entries)
+	}
+	if _, err := Run(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	c, _, err := spec.LoadComponent(cfg.Components, "x")
+	if err != nil || c.Status != spec.Fail || !strings.Contains(c.Summary, "appears twice") {
+		t.Fatalf("component = %+v, %v", c, err)
+	}
+	last := c.Checks[len(c.Checks)-1]
+	if last.Name != "beacon" || !strings.Contains(last.Detail, "without its stats") {
+		t.Fatalf("checks = %+v", c.Checks)
+	}
+	// The adapter works again: the warning goes.
+	os.WriteFile(badRun, []byte("#!/bin/sh\necho '{}'\n"), 0o755)
+	run.ID = "r2"
+	FinishRun(context.Background(), cfg, defs["x"], run)
+	Run(context.Background(), cfg)
+	c, _, _ = spec.LoadComponent(cfg.Components, "x")
+	for _, k := range c.Checks {
+		if k.Name == "beacon" {
+			t.Fatalf("warning kept: %+v", k)
+		}
+	}
+}
+
+func TestDefinitionsRejectWhatCantBeWritten(t *testing.T) {
+	cfg := config(t)
+	os.WriteFile(filepath.Join(cfg.Definitions, "host.json"), []byte(`{"id":"host"}`), 0o644)
+	os.WriteFile(filepath.Join(cfg.Definitions, "long.json"), []byte(`{"id":"long","title":"`+strings.Repeat("x", 101)+`"}`), 0o644)
+	os.WriteFile(filepath.Join(cfg.Definitions, "grace.json"), []byte(`{"id":"grace","schedule":{"grace":"soon"}}`), 0o644)
+	defs, invalid := Definitions(cfg.Definitions)
+	if len(defs) != 0 || len(invalid) != 3 {
+		t.Fatalf("defs=%v invalid=%+v", defs, invalid)
+	}
+}

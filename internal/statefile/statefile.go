@@ -29,6 +29,9 @@ type State struct {
 	Defined   []string             `json:"defined,omitempty"`  // definitions seen last collect
 	Implicit  []string             `json:"implicit,omitempty"` // exec-only components written last collect
 	PrunedAt  time.Time            `json:"pruned_at,omitempty"`
+	// The last run adapter failure per component, until its adapter works again (shown as a
+	// warning on the component: the run was logged without its stats).
+	RunAdapter map[string]string `json:"run_adapter,omitempty"`
 }
 
 func read(path string) (State, error) {
