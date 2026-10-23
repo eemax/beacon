@@ -265,3 +265,30 @@ func TestFit(t *testing.T) {
 		t.Fatalf("%v %+v", err, c.Gauges)
 	}
 }
+
+func TestStateEvery(t *testing.T) {
+	cfg := config(t)
+	counter := filepath.Join(t.TempDir(), "n")
+	adapter := script(t, cfg.Definitions, "slow.state", `echo x >> `+counter+`; echo '{"status":"ok","summary":"fine"}'`)
+	data, _ := json.Marshal(map[string]any{"id": "slow", "state": adapter, "state_every": "5m"})
+	os.WriteFile(filepath.Join(cfg.Definitions, "slow.json"), data, 0o644)
+	start := time.Now()
+	for i, at := range []time.Duration{0, time.Minute, 4 * time.Minute, 6 * time.Minute} {
+		cfg.Now = func() time.Time { return start.Add(at) }
+		if _, err := Run(context.Background(), cfg); err != nil {
+			t.Fatal(i, err)
+		}
+	}
+	runs, _ := os.ReadFile(counter)
+	if n := strings.Count(string(runs), "x"); n != 2 { // at 0 and at 6 min
+		t.Fatalf("adapter ran %d times", n)
+	}
+	c, _, _ := spec.LoadComponent(cfg.Components, "slow")
+	if c.Summary != "fine" {
+		t.Fatalf("cached result not used: %+v", c)
+	}
+	os.WriteFile(filepath.Join(cfg.Definitions, "bad.json"), []byte(`{"id":"bad","state_every":"5m"}`), 0o644)
+	if _, invalid := Definitions(cfg.Definitions); len(invalid) != 1 {
+		t.Fatal("state_every without a state adapter accepted")
+	}
+}

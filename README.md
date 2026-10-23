@@ -65,6 +65,7 @@ didn't happen (`schedule.grace` after it was due).
 | `probes` | checks as a client would see the service (see Services below) |
 | `run` | **run adapter**: an executable run once per finished run (see below) |
 | `state` | **state adapter**: an executable run every minute (see below) |
+| `state_every` | run the state adapter at most this often (e.g. `5m`) and reuse its last result in between: for adapters that are slow or call an API. Runs, services and probes still update every minute |
 
 ### Adapters
 

@@ -68,7 +68,10 @@ type Definition struct {
 	} `json:"schedule,omitempty"`
 	Probes []probe.Probe `json:"probes,omitempty"` // HTTP(S)/TCP checks, as a client would see the service
 	State  string        `json:"state,omitempty"`  // command printing {status, summary, gauges, checks, links}
-	Run    string        `json:"run,omitempty"`    // command printing {summary, stats, artifacts, error} for a finished run
+	// How often to run the state adapter (default: every collect). Between runs its last
+	// result is reused, so a slow or rate-limited adapter needn't run every minute.
+	StateEvery string `json:"state_every,omitempty"`
+	Run        string `json:"run,omitempty"` // command printing {summary, stats, artifacts, error} for a finished run
 }
 
 func (d *Definition) validate(file string) error {
@@ -100,6 +103,14 @@ func (d *Definition) validate(file string) error {
 	if d.Schedule != nil && d.Schedule.Interval != "" {
 		if _, err := spec.ParseDuration(d.Schedule.Interval); err != nil {
 			return fmt.Errorf("schedule.interval: %w", err)
+		}
+	}
+	if d.StateEvery != "" {
+		if _, err := spec.ParseDuration(d.StateEvery); err != nil {
+			return fmt.Errorf("state_every: %w", err)
+		}
+		if d.State == "" {
+			return errors.New("state_every: there's no state adapter")
 		}
 	}
 	// What the definition puts into the component (title, expect_every, schedule) must be
@@ -417,7 +428,7 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 
 	// State adapter: gauges, checks, summary, status, links.
 	if d.State != "" {
-		out, err := runCommand(ctx, d.State, []string{"BEACON_COMPONENT=" + d.ID}, cfg.Timeout)
+		out, err := stateAdapter(ctx, cfg, d, now)
 		var so stateOutput
 		if err == nil {
 			err = spec.Decode(out, &so)
@@ -460,6 +471,44 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 	}
 	res.Updated = append(res.Updated, d.ID)
 	return nil
+}
+
+// cached is a state adapter's last result (stdout, or why it failed), for state_every.
+type cached struct {
+	At    time.Time       `json:"at"`
+	Out   json.RawMessage `json:"out,omitempty"`
+	Error string          `json:"error,omitempty"`
+}
+
+// stateAdapter runs d's state adapter, or reuses its last result while that's younger than
+// state_every. Failures are kept too: a failing slow adapter isn't retried every minute.
+func stateAdapter(ctx context.Context, cfg Config, d *Definition, now time.Time) ([]byte, error) {
+	every, _ := spec.ParseDuration(d.StateEvery)
+	path := filepath.Join(filepath.Dir(cfg.State), "cache", d.ID+".json")
+	if every > 0 {
+		var c cached
+		if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &c) == nil && now.Sub(c.At) < every && !c.At.After(now) {
+			if c.Error != "" {
+				return nil, errors.New(c.Error)
+			}
+			return c.Out, nil
+		}
+	}
+	out, err := runCommand(ctx, d.State, []string{"BEACON_COMPONENT=" + d.ID}, cfg.Timeout)
+	if every > 0 {
+		c := cached{At: now}
+		if err != nil {
+			c.Error = err.Error()
+		} else if json.Valid(out) {
+			c.Out = out
+		} else {
+			c.Error = "not valid JSON"
+		}
+		if data, merr := json.Marshal(c); merr == nil && os.MkdirAll(filepath.Dir(path), 0o700) == nil {
+			spec.WriteFileAtomic(path, data, 0o600)
+		}
+	}
+	return out, err
 }
 
 // fit keeps a component within the SPEC limits once the adapter's, the services' and the

@@ -86,8 +86,10 @@ func (s *Server) authed(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		s.Log.Debug("request", "token", name, "path", r.URL.Path)
-		next(w, r)
+		start, sw := time.Now(), &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next(sw, r)
+		// One line per request: lets a hub's timeouts be told apart from slow answers.
+		s.Log.Info("request", "token", name, "path", r.URL.Path, "query", r.URL.RawQuery, "status", sw.status, "ms", time.Since(start).Milliseconds())
 	}
 }
 
@@ -156,3 +158,10 @@ func (s *Server) writeJSON(w http.ResponseWriter, r *http.Request, etag string, 
 	}
 	w.Write(append(data, '\n'))
 }
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) { w.status = code; w.ResponseWriter.WriteHeader(code) }
