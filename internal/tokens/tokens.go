@@ -1,4 +1,4 @@
-// Package tokens keeps the bearer tokens that may read feeds. The file holds one
+// Package tokens keeps the bearer tokens that may read this box (state and log). The file holds one
 // "<name> <sha256-hex>" line per token, never the token itself, so reading the file
 // doesn't let anyone in.
 package tokens
