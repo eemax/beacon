@@ -114,7 +114,8 @@ type Run struct {
 
 type EventKind string
 
-// Event is a reboot, deploy, config change or note (a log entry).
+// Event is a reboot, deploy, config change, note, or a service that crashed or failed
+// (a log entry).
 type Event struct {
 	Seq       int64     `json:"seq,omitempty"`
 	Type      string    `json:"type"` // "event"
@@ -130,7 +131,7 @@ var (
 	namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 	idPattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 	Triggers    = map[string]bool{"timer": true, "manual": true, "boot": true, "dependency": true, "other": true}
-	Kinds       = map[EventKind]bool{"reboot": true, "deploy": true, "config": true, "note": true}
+	Kinds       = map[EventKind]bool{"reboot": true, "deploy": true, "config": true, "note": true, "service": true}
 )
 
 // ValidName reports whether s can be a component id, metric key or label name.
@@ -336,7 +337,7 @@ func (e *Event) Validate() error {
 		p.add("at: required")
 	}
 	if !Kinds[e.Kind] {
-		p.add("kind: must be reboot, deploy, config or note")
+		p.add("kind: must be reboot, deploy, config, note or service")
 	}
 	if e.Component != "" && !ValidName(e.Component) {
 		p.add("component: %q is not a valid id", e.Component)

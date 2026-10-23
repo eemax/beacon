@@ -301,8 +301,8 @@ func cmdEvent(args []string) error {
 		return err
 	}
 	kind := spec.EventKind(args[0])
-	if kind == "reboot" {
-		return usageError{"reboots are logged by beacon collect"}
+	if kind == "reboot" || kind == "service" {
+		return usageError{"reboots and service crashes are logged by beacon collect"}
 	}
 	e := &spec.Event{Type: "event", ID: collect.NewID(), At: time.Now().UTC().Truncate(time.Second), Kind: kind, Component: *component, Title: *title, Detail: *detail}
 	if err := os.MkdirAll(p.data, 0o755); err != nil {

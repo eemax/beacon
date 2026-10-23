@@ -126,7 +126,7 @@ reused) and `type`.
 |---|---|---|
 | `id` | yes | unique per box, at most 64 |
 | `at` | yes | |
-| `kind` | yes | `reboot`, `deploy`, `config`, `note` |
+| `kind` | yes | `reboot`, `deploy`, `config`, `note`, `service` (a long-running service crashed, or failed) |
 | `component` | no | the component it's about, or null for the whole box |
 | `title` | yes | at most 200 |
 | `detail` | no | at most 2000 |

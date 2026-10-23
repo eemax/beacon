@@ -219,3 +219,49 @@ func TestDefinitionsRejectWhatCantBeWritten(t *testing.T) {
 		t.Fatalf("defs=%v invalid=%+v", defs, invalid)
 	}
 }
+
+func TestServices(t *testing.T) {
+	cfg := config(t)
+	d := &Definition{ID: "files"}
+	now := time.Now().UTC().Truncate(time.Second)
+	caddy := systemd.Unit{Name: "caddy.service", Type: "notify", InvocationID: "a1", ActiveState: "active", ActiveSince: now.Add(-time.Hour), Memory: 64 << 20}
+	dufs := systemd.Unit{Name: "dufs.service", Type: "simple", InvocationID: "b1", ActiveState: "active", ActiveSince: now.Add(-time.Hour), Memory: -1}
+	c := &spec.Component{ID: "files", UpdatedAt: now}
+	res := &Result{}
+	if s := serviceState(cfg, d, []systemd.Unit{caddy, dufs}, now, c, res); s != "caddy, dufs are up" {
+		t.Fatalf("summary %q", s)
+	}
+	if len(c.Checks) != 2 || len(c.Gauges) != 5 { // uptime×2, restarts×2, memory×1
+		t.Fatalf("checks %+v gauges %+v", c.Checks, c.Gauges)
+	}
+	// dufs crashed and systemd restarted it; caddy was restarted on purpose (no event).
+	dufs.InvocationID, dufs.Restarts = "b2", 1
+	caddy.InvocationID = "a2"
+	serviceState(cfg, d, []systemd.Unit{caddy, dufs}, now, &spec.Component{ID: "files", UpdatedAt: now}, res)
+	// Then caddy fails for good.
+	caddy.ActiveState, caddy.Result = "failed", "exit-code"
+	c = &spec.Component{ID: "files", UpdatedAt: now}
+	if s := serviceState(cfg, d, []systemd.Unit{caddy, dufs}, now, c, res); s != "caddy failed" {
+		t.Fatalf("summary %q", s)
+	}
+	if c.Checks[0].Status != spec.Fail {
+		t.Fatalf("checks %+v", c.Checks)
+	}
+	serviceState(cfg, d, []systemd.Unit{caddy, dufs}, now, &spec.Component{ID: "files", UpdatedAt: now}, res) // still failed: no second event
+	entries, _, _, _ := logbook.Log{Path: cfg.Log}.Read(0, 10)
+	if len(entries) != 2 || !strings.Contains(string(entries[0]), "dufs.service crashed") || !strings.Contains(string(entries[1]), "caddy.service failed") {
+		t.Fatalf("events: %s", entries)
+	}
+}
+
+func TestFit(t *testing.T) {
+	c := &spec.Component{ID: "x", UpdatedAt: time.Now()}
+	for i := 0; i < 8; i++ {
+		c.Gauges = append(c.Gauges, spec.Metric{Key: "a", Value: 1, Primary: true, Labels: spec.Labels{"n": strings.Repeat("x", i+1)}})
+	}
+	c.Gauges = append(c.Gauges, spec.Metric{Key: "a", Value: 2, Labels: spec.Labels{"n": "x"}}) // a duplicate
+	fit(c)
+	if err := c.Validate(); err != nil || len(c.Gauges) != 8 || c.Gauges[0].Value != 1 {
+		t.Fatalf("%v %+v", err, c.Gauges)
+	}
+}

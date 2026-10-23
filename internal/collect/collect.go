@@ -32,6 +32,7 @@ import (
 
 	"github.com/eemax/beacon/internal/host"
 	"github.com/eemax/beacon/internal/logbook"
+	"github.com/eemax/beacon/internal/probe"
 	"github.com/eemax/beacon/internal/spec"
 	"github.com/eemax/beacon/internal/statefile"
 	"github.com/eemax/beacon/internal/systemd"
@@ -65,8 +66,9 @@ type Definition struct {
 		Grace    string `json:"grace,omitempty"`    // default 1h
 		Interval string `json:"interval,omitempty"` // without timers: next run = last start + interval
 	} `json:"schedule,omitempty"`
-	State string `json:"state,omitempty"` // command printing {status, summary, gauges, checks, links}
-	Run   string `json:"run,omitempty"`   // command printing {summary, stats, artifacts, error} for a finished run
+	Probes []probe.Probe `json:"probes,omitempty"` // HTTP(S)/TCP checks, as a client would see the service
+	State  string        `json:"state,omitempty"`  // command printing {status, summary, gauges, checks, links}
+	Run    string        `json:"run,omitempty"`    // command printing {summary, stats, artifacts, error} for a finished run
 }
 
 func (d *Definition) validate(file string) error {
@@ -78,6 +80,19 @@ func (d *Definition) validate(file string) error {
 	}
 	if d.Systemd != nil && len(d.Systemd.Units) == 0 {
 		return errors.New("systemd.units: required")
+	}
+	if len(d.Probes) > probe.MaxCount {
+		return fmt.Errorf("probes: %d, at most %d", len(d.Probes), probe.MaxCount)
+	}
+	names := map[string]bool{}
+	for i, p := range d.Probes {
+		if err := p.Validate(); err != nil {
+			return fmt.Errorf("probes[%d]: %w", i, err)
+		}
+		if names[p.Label()] {
+			return fmt.Errorf("probes[%d]: %q twice (set name)", i, p.Label())
+		}
+		names[p.Label()] = true
 	}
 	if d.Systemd != nil && d.Systemd.Trigger != "" && !spec.Triggers[d.Systemd.Trigger] {
 		return fmt.Errorf("systemd.trigger: %q is not a trigger", d.Systemd.Trigger)
@@ -311,8 +326,10 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 		c.ExpectEvery = "10m"
 	}
 	var notes []string
+	var services []systemd.Unit
 
-	// systemd: new invocations become runs; one in progress becomes `running`.
+	// systemd: a job's new invocations become runs, one in progress becomes `running`;
+	// services are looked at below.
 	if d.Systemd != nil {
 		if !systemd.Supported {
 			notes = append(notes, "systemd units listed, but systemd isn't available here")
@@ -324,6 +341,10 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 			u, err := systemd.Show(name)
 			if err != nil {
 				notes = append(notes, err.Error())
+				continue
+			}
+			if !u.Job() {
+				services = append(services, u)
 				continue
 			}
 			if u.Running() && !u.Start.IsZero() {
@@ -346,6 +367,8 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 			res.ok("%s: run %s (%s, %s)", d.ID, run.ID, run.Outcome, run.EndedAt.Sub(run.StartedAt))
 		}
 	}
+	svcSummary := serviceState(cfg, d, services, now, c, res)
+
 	// `beacon exec` runs in progress.
 	st, _ := statefile.Read(cfg.State)
 	for id, m := range st.Running {
@@ -407,8 +430,23 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 		if err != nil {
 			c.Status, c.Summary = spec.Fail, truncate("state adapter failed: "+oneLine(err.Error()), 500)
 		} else {
-			c.Status, c.Summary, c.Gauges, c.Checks, c.Links = so.Status, so.Summary, so.Gauges, so.Checks, so.Links
+			c.Status, c.Summary, c.Links = so.Status, so.Summary, so.Links
+			c.Gauges, c.Checks = append(so.Gauges, c.Gauges...), append(so.Checks, c.Checks...) // the adapter's first
 		}
+	}
+	// Probes: rows of their own (probe=…), after the adapter's, so they're never lost to it.
+	for i, p := range d.Probes {
+		g, k := probe.Run(ctx, p, now)
+		for j := range g {
+			g[j].Primary = g[j].Primary && i == 0 // the first probe's numbers are the headline
+			if i == 0 && g[j].Key == "latency" {
+				g[j].Primary = true
+			}
+		}
+		c.Gauges, c.Checks = append(c.Gauges, g...), append(c.Checks, k...)
+	}
+	if d.State == "" && c.Summary == "" {
+		c.Summary = svcSummary
 	}
 	if msg := st.RunAdapter[d.ID]; msg != "" {
 		notes = append(notes, "last run logged without its stats: "+msg)
@@ -416,11 +454,111 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 	if len(notes) > 0 && len(c.Checks) < 50 {
 		c.Checks = append(c.Checks, spec.Check{Name: "beacon", Status: spec.Warn, Detail: truncate(strings.Join(notes, "; "), 500)})
 	}
+	fit(c)
 	if err := spec.WriteComponent(cfg.Components, c); err != nil {
 		return err
 	}
 	res.Updated = append(res.Updated, d.ID)
 	return nil
+}
+
+// fit keeps a component within the SPEC limits once the adapter's, the services' and the
+// probes' parts are together: a series that appears twice keeps its first value, and the
+// lists are cut at their maximums (at most 6 headline numbers).
+func fit(c *spec.Component) {
+	seen := map[string]bool{}
+	gauges := c.Gauges[:0:0]
+	primary := 0
+	for _, m := range c.Gauges {
+		if seen[m.SeriesID()] || len(gauges) == 100 {
+			continue
+		}
+		seen[m.SeriesID()] = true
+		if m.Primary {
+			if primary == 6 {
+				m.Primary = false
+			} else {
+				primary++
+			}
+		}
+		gauges = append(gauges, m)
+	}
+	c.Gauges = gauges
+	if len(c.Checks) > 50 {
+		c.Checks = c.Checks[:50]
+	}
+}
+
+// serviceState adds a long-running unit's facts to the component (an "active" check, and
+// uptime, restarts and memory, labelled unit=<name>) and logs a `service` event when
+// systemd restarted it after a crash or it failed. Intended restarts (a deploy, systemctl
+// restart) stay quiet: the deploy event says why. Returns a one-line summary.
+func serviceState(cfg Config, d *Definition, units []systemd.Unit, now time.Time, c *spec.Component, res *Result) string {
+	if len(units) == 0 {
+		return ""
+	}
+	var events []*spec.Event
+	var up, down []string
+	statefile.Update(cfg.State, func(s *statefile.State) error {
+		for _, u := range units {
+			name := strings.TrimSuffix(u.Name, ".service")
+			labels := spec.Labels{"unit": name}
+			check := spec.Check{Name: "active", Status: spec.OK, Labels: labels}
+			switch u.ActiveState {
+			case "active", "reloading":
+				up = append(up, name)
+				if !u.ActiveSince.IsZero() {
+					c.Gauges = append(c.Gauges, spec.Metric{Key: "uptime", Label: "Up for", Value: now.Sub(u.ActiveSince).Truncate(time.Second).Seconds(), Unit: "s", Labels: labels})
+				}
+			case "activating":
+				check.Status, check.Detail = spec.Warn, "starting ("+u.SubState+")"
+				down = append(down, name+" starting")
+			case "failed":
+				check.Status, check.Detail = spec.Fail, "failed (result: "+u.Result+")"
+				down = append(down, name+" failed")
+			default:
+				check.Status, check.Detail = spec.Fail, u.ActiveState
+				down = append(down, name+" "+u.ActiveState)
+			}
+			c.Checks = append(c.Checks, check)
+			c.Gauges = append(c.Gauges, spec.Metric{Key: "restarts", Label: "Restarts", Value: float64(u.Restarts), Unit: "count", Labels: labels})
+			if u.Memory >= 0 {
+				c.Gauges = append(c.Gauges, spec.Metric{Key: "memory", Label: "Memory", Value: float64(u.Memory), Unit: "bytes", Labels: labels})
+			}
+
+			prev, known := s.Services[u.Name]
+			switch {
+			case !known:
+			case u.Restarts > prev.Restarts && u.InvocationID != prev.Invocation:
+				n := u.Restarts - prev.Restarts
+				title := u.Name + " crashed and was restarted by systemd"
+				if n > 1 {
+					title = fmt.Sprintf("%s crashed and was restarted by systemd (%d times)", u.Name, n)
+				}
+				events = append(events, &spec.Event{Type: "event", ID: NewID(), At: now, Kind: "service", Component: d.ID, Title: title,
+					Detail: truncate(lastLines(systemd.Journal(prev.Invocation, 15), 2000), 2000)})
+			case u.ActiveState == "failed" && prev.State != "failed":
+				events = append(events, &spec.Event{Type: "event", ID: NewID(), At: now, Kind: "service", Component: d.ID, Title: u.Name + " failed",
+					Detail: truncate(lastLines(systemd.Journal(u.InvocationID, 15), 2000), 2000)})
+			}
+			s.Services[u.Name] = statefile.Service{Invocation: u.InvocationID, Restarts: u.Restarts, State: u.ActiveState}
+		}
+		return nil
+	})
+	for _, e := range events {
+		if _, err := (logbook.Log{Path: cfg.Log}).Append(e); err != nil {
+			res.fail("%s: service event: %v", d.ID, err)
+		} else {
+			res.ok("%s: %s", d.ID, e.Title)
+		}
+	}
+	if len(down) > 0 {
+		return strings.Join(down, ", ")
+	}
+	if len(up) == 1 {
+		return up[0] + " is up"
+	}
+	return strings.Join(up, ", ") + " are up"
 }
 
 func trigger(d *Definition, u systemd.Unit, timers []systemd.Timer) string {

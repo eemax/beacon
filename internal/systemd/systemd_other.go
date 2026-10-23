@@ -2,25 +2,9 @@
 
 package systemd
 
-import (
-	"errors"
-	"time"
-)
+import "errors"
 
 const Supported = false
-
-type Unit struct {
-	Name, Type, InvocationID, ActiveState, Result string
-	Start, Exit                                   time.Time
-	ExitCode, ExitStatus                          int
-}
-
-func (u Unit) Running() bool { return false }
-
-type Timer struct {
-	Unit, Activates string
-	Next, Last      time.Time
-}
 
 var errUnsupported = errors.New("systemd is only available on Linux (use beacon exec)")
 

@@ -62,6 +62,7 @@ didn't happen (`schedule.grace` after it was due).
 | `schedule.grace` | how late a run may be before it counts as missed (default `1h`) |
 | `schedule.interval` | without timers: next run = last start + this |
 | `expect_every` | how stale the component may get before the hub says so (default `10m`) |
+| `probes` | checks as a client would see the service (see Services below) |
 | `run` | **run adapter**: an executable run once per finished run (see below) |
 | `state` | **state adapter**: an executable run every minute (see below) |
 
@@ -87,6 +88,37 @@ Adapters describe, the hub presents (SPEC.md → How a hub presents it): mark th
 numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that
 are about one of several things (`endpoint=styles`): the hub turns those into a table
 with a row per thing, without any display code anywhere.
+
+### Services
+
+`systemd.units` may also name long-running services (any unit that isn't `Type=oneshot`):
+Caddy, a database, a daemon of your own. For each, the component gets an **active** check
+and its uptime, automatic restarts and memory, labelled `unit=<name>` (a table in the
+hub). When systemd restarts one after a crash, or it fails, beacon logs a `service` event
+with the journal's last lines. Restarts you made (a deploy, `systemctl restart`) stay quiet:
+log a deploy event for those.
+
+**Probes** check a service the way a client would, from the box:
+
+```json
+{
+  "id": "files",
+  "title": "File store",
+  "systemd": { "units": ["caddy.service", "dufs.service"] },
+  "probes": [
+    { "url": "https://files.example.com/", "expect": [200, 401] },
+    { "name": "ssh", "tcp": "127.0.0.1:22" }
+  ]
+}
+```
+
+A `url` probe (`http://` or `https://`, redirects not followed) reports a **reachable**
+check (the status must be in `expect`, default 200-399) and the response time; over HTTPS
+also the **certificate** actually served: how long until it expires (warn under 14 days,
+fail under 7) and whether clients would accept it. A `tcp` probe connects and reports
+reachable and the time it took. Rows are labelled `probe=<name>` (default: the host). The
+first probe's numbers are the component's headline. Every collect runs them (10 s limit
+each).
 
 ### Jobs that aren't systemd units
 

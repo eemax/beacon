@@ -1,8 +1,9 @@
 //go:build linux
 
-// Package systemd reads what systemd knows about job units: each unit's last invocation
-// (InvocationID, start, exit, result, exit status), the timers that start them, and the
-// journal of one invocation.
+// Package systemd reads what systemd knows: for job units, each one's last invocation
+// (InvocationID, start, exit, result, exit status) and the timers that start them; for
+// services, whether they're up, since when, how often systemd restarted them and their
+// memory; and the journal of one invocation.
 package systemd
 
 import (
@@ -16,30 +17,15 @@ import (
 
 const Supported = true
 
-type Unit struct {
-	Name         string
-	Type         string
-	InvocationID string
-	ActiveState  string // active, activating, deactivating, inactive, failed, …
-	Result       string // success, exit-code, signal, timeout, …
-	Start, Exit  time.Time
-	ExitCode     int // ExecMainCode: 1 exited, 2 killed, 3 dumped
-	ExitStatus   int // exit status, or the signal number when killed
-}
-
-// Running reports whether an invocation is in progress (a oneshot job is "activating").
-func (u Unit) Running() bool {
-	return u.ActiveState == "activating" || u.ActiveState == "active" || u.ActiveState == "deactivating" || u.ActiveState == "reloading"
-}
-
-var props = "Type,InvocationID,ActiveState,Result,ExecMainStartTimestamp,ExecMainExitTimestamp,ExecMainCode,ExecMainStatus"
+var props = "Type,InvocationID,ActiveState,SubState,Result,ExecMainStartTimestamp,ExecMainExitTimestamp,ExecMainCode,ExecMainStatus,ActiveEnterTimestamp,NRestarts,MemoryCurrent,LoadState"
 
 func Show(name string) (Unit, error) {
 	out, err := exec.Command("systemctl", "show", name, "-p", props, "--timestamp=unix").Output()
 	if err != nil {
 		return Unit{}, fmt.Errorf("systemctl show %s: %w", name, err)
 	}
-	u := Unit{Name: name}
+	u := Unit{Name: name, Memory: -1}
+	loaded := true
 	for _, line := range strings.Split(string(out), "\n") {
 		k, v, ok := strings.Cut(line, "=")
 		if !ok {
@@ -62,7 +48,23 @@ func Show(name string) (Unit, error) {
 			u.ExitCode, _ = strconv.Atoi(v)
 		case "ExecMainStatus":
 			u.ExitStatus, _ = strconv.Atoi(v)
+		case "SubState":
+			u.SubState = v
+		case "ActiveEnterTimestamp":
+			u.ActiveSince = unix(v)
+		case "NRestarts":
+			u.Restarts, _ = strconv.Atoi(v)
+		case "MemoryCurrent":
+			// "[not set]", or 2^64-1 when accounting is off.
+			if n, err := strconv.ParseUint(v, 10, 64); err == nil && n < 1<<62 {
+				u.Memory = int64(n)
+			}
+		case "LoadState":
+			loaded = v == "loaded"
 		}
+	}
+	if !loaded {
+		return u, fmt.Errorf("%s: no such unit", name)
 	}
 	return u, nil
 }
@@ -74,13 +76,6 @@ func unix(v string) time.Time {
 		return time.Time{}
 	}
 	return time.Unix(n, 0).UTC()
-}
-
-type Timer struct {
-	Unit      string
-	Activates string
-	Next      time.Time // zero when it won't elapse again
-	Last      time.Time
 }
 
 func Timers() ([]Timer, error) {

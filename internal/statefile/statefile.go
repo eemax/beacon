@@ -19,6 +19,13 @@ type Marker struct {
 	PID       int       `json:"pid"`
 }
 
+// Service is what collect last saw of a long-running unit, to notice crashes.
+type Service struct {
+	Invocation string `json:"invocation"`
+	Restarts   int    `json:"restarts"`
+	State      string `json:"state"`
+}
+
 type State struct {
 	BootID  string            `json:"boot_id,omitempty"`
 	Kernel  string            `json:"kernel,omitempty"`
@@ -31,7 +38,8 @@ type State struct {
 	PrunedAt  time.Time            `json:"pruned_at,omitempty"`
 	// The last run adapter failure per component, until its adapter works again (shown as a
 	// warning on the component: the run was logged without its stats).
-	RunAdapter map[string]string `json:"run_adapter,omitempty"`
+	RunAdapter map[string]string  `json:"run_adapter,omitempty"`
+	Services   map[string]Service `json:"services,omitempty"` // service unit → last seen
 }
 
 func read(path string) (State, error) {
@@ -74,6 +82,9 @@ func Update(path string, fn func(*State) error) error {
 	}
 	if s.Running == nil {
 		s.Running = map[string]Marker{}
+	}
+	if s.Services == nil {
+		s.Services = map[string]Service{}
 	}
 	if err := fn(&s); err != nil {
 		return err

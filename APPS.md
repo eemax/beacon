@@ -36,6 +36,15 @@ The work is split three ways:
 So your app stays beacon-free. It exposes good facts in its own words; one small adapter
 maps them. If you follow the shapes below, the adapter is little more than a rename.
 
+## Software you didn't write
+
+Caddy, a database, Authelia, cloudflared: nobody writes an app around those. beacon covers
+them generically: name their systemd units in a definition and it reports each one's
+state, uptime, restarts and memory, and logs crashes; a probe checks what clients get (the
+status code, the response time, the TLS certificate as served). Only add an adapter when
+the software has facts worth more than that (its own API or database); then this guide's
+shapes apply to the adapter instead.
+
 ## The checklist
 
 1. **Run as a systemd unit** (a `Type=oneshot` service plus a timer for scheduled jobs; a
