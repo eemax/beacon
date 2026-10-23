@@ -112,7 +112,7 @@ Write it on failure too, with what's known (counts so far, `error`). A failed ru
 ```json
 {
   "healthy": false,
-  "problems": ["boms: no success since 2026-10-21 23:10 UTC (expected daily)"],
+  "problems": ["boms: no success since 2026-10-21T23:10:00Z (expected daily)"],
   "metrics": [
     { "key": "records.total", "label": "Records", "value": 365696, "unit": "count", "primary": true },
     { "key": "db.size", "label": "Database", "value": 1158201344, "unit": "bytes", "primary": true },
@@ -120,7 +120,7 @@ Write it on failure too, with what's known (counts so far, `error`). A failed ru
   ],
   "checks": [
     { "name": "healthy", "status": "ok", "labels": { "endpoint": "styles" } },
-    { "name": "healthy", "status": "fail", "detail": "no success since 2026-10-21 23:10 UTC", "labels": { "endpoint": "boms" } }
+    { "name": "healthy", "status": "fail", "detail": "no success since 2026-10-21T23:10:00Z", "labels": { "endpoint": "boms" } }
   ],
   "last_run": { "...": "the run record" }
 }
@@ -154,14 +154,16 @@ Box-level numbers (CPU, memory, disk) are beacon's built-in `host` component: sk
 **Checks: yes/no questions with a reason.** Use a check, not a number, when the answer is
 "is this OK?": an upstream reachable, credentials valid, each source fresh within its
 expected age, a config sane. `status`: `ok`, `warn`, `fail`; `detail` says why in plain
-words ("no success since 2026-10-21 23:10 UTC, expected daily", not "stale=true").
+words ("no success since 2026-10-21T23:10:00Z, expected daily", not "stale=true").
 Freshness belongs here as a check with the threshold in your app, not as a raw "age"
 number that rises all day.
 
-**Times in text are clock times, never ages.** A detail or summary is read minutes after
-it was written (beacon collects every minute, the hub polls every few), so "heartbeat 28 s
-ago" is wrong by the time anyone sees it. Write "last heartbeat 06:58 UTC" (or the date
-too when it's not today); the hub shows ages itself, from timestamps it can trust.
+**Times in text are timestamps, never ages.** A detail or summary is read minutes after it
+was written (beacon collects every minute, the hub polls every few), so "heartbeat 28 s
+ago" is wrong by the time anyone sees it. Write the time as RFC 3339 UTC, to the second:
+`"last heartbeat 2026-10-23T06:58:12Z"`. The hub finds timestamps in text and shows them
+like its own times: in the reader's time zone, with the date when it isn't today (and as
+UTC where it can't, like in a chat message).
 
 **Headline numbers (`primary`).** At most 3 to 6 that answer "how did it go?" (for a
 fetch: new and changed records; for a report: readiness and findings). They're shown on

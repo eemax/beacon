@@ -39,7 +39,9 @@ appear once per list.
 
 **Link:** `title` (at most 100) and `url` (`http(s)://`, at most 500).
 
-**Times** are RFC 3339 strings; **durations** are like `90s`, `5m`, `26h`, `1h30m`.
+**Times** are RFC 3339 strings; **durations** are like `90s`, `5m`, `26h`, `1h30m`. A time
+inside free text (a summary, a check's detail, an error) is also written as RFC 3339 UTC
+(`2026-10-23T06:58:12Z`), never as an age: hubs show it in the reader's time zone.
 
 Unknown fields are rejected by beacon, so a typo fails loudly; hubs ignore fields they
 don't know. **Never put secrets in anything beacon serves.**
