@@ -162,8 +162,8 @@ number that rises all day.
 was written (beacon collects every minute, the hub polls every few), so "heartbeat 28 s
 ago" is wrong by the time anyone sees it. Write the time as RFC 3339 UTC, to the second:
 `"last heartbeat 2026-10-23T06:58:12Z"`. The hub finds timestamps in text and shows them
-like its own times: in the reader's time zone, with the date when it isn't today (and as
-UTC where it can't, like in a chat message).
+like its own times, worked out when someone looks ("last heartbeat 2 min ago", the exact
+time in their time zone on hover; UTC where it can't, like in a chat message).
 
 **Headline numbers (`primary`).** At most 3 to 6 that answer "how did it go?" (for a
 fetch: new and changed records; for a report: readiness and findings). They're shown on

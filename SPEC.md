@@ -41,7 +41,8 @@ appear once per list.
 
 **Times** are RFC 3339 strings; **durations** are like `90s`, `5m`, `26h`, `1h30m`. A time
 inside free text (a summary, a check's detail, an error) is also written as RFC 3339 UTC
-(`2026-10-23T06:58:12Z`), never as an age: hubs show it in the reader's time zone.
+(`2026-10-23T06:58:12Z`), never as an age: hubs show it like their own times (lookout:
+"2 min ago", the exact time in the reader's time zone on hover).
 
 Unknown fields are rejected by beacon, so a typo fails loudly; hubs ignore fields they
 don't know. **Never put secrets in anything beacon serves.**
