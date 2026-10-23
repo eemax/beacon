@@ -27,7 +27,7 @@ display from that the same way for every component.
 | `key` | yes | `[a-z0-9][a-z0-9._-]*`, at most 64 characters |
 | `value` | yes | a finite number |
 | `label` | no | at most 100; sentence case, without the component's name (`New records`). Hubs fall back to the key |
-| `unit` | no | at most 16: `count`, `percent` (0-100), `bytes`, `s`, `ms`, or anything else (shown after the value) |
+| `unit` | no | at most 16: `count`, `percent` (0-100), `bytes`, `s`, `ms`, a currency code (`usd`, ISO 4217), or anything else (shown after the value) |
 | `labels` | no | at most 4 `{"name": "value"}`: which of several things it's about (`{"endpoint": "styles"}`). Names like keys, values 1-64 characters without `, = { }` |
 | `primary` | no | `true` for a headline number (at most 6 per list) |
 

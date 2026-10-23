@@ -112,7 +112,7 @@ Write it on failure too, with what's known (counts so far, `error`). A failed ru
 ```json
 {
   "healthy": false,
-  "problems": ["boms: last success 30 h ago (expected daily)"],
+  "problems": ["boms: no success since 2026-10-21 23:10 UTC (expected daily)"],
   "metrics": [
     { "key": "records.total", "label": "Records", "value": 365696, "unit": "count", "primary": true },
     { "key": "db.size", "label": "Database", "value": 1158201344, "unit": "bytes", "primary": true },
@@ -120,7 +120,7 @@ Write it on failure too, with what's known (counts so far, `error`). A failed ru
   ],
   "checks": [
     { "name": "healthy", "status": "ok", "labels": { "endpoint": "styles" } },
-    { "name": "healthy", "status": "fail", "detail": "last success 30 h ago", "labels": { "endpoint": "boms" } }
+    { "name": "healthy", "status": "fail", "detail": "no success since 2026-10-21 23:10 UTC", "labels": { "endpoint": "boms" } }
   ],
   "last_run": { "...": "the run record" }
 }
@@ -154,8 +154,14 @@ Box-level numbers (CPU, memory, disk) are beacon's built-in `host` component: sk
 **Checks: yes/no questions with a reason.** Use a check, not a number, when the answer is
 "is this OK?": an upstream reachable, credentials valid, each source fresh within its
 expected age, a config sane. `status`: `ok`, `warn`, `fail`; `detail` says why in plain
-words ("last success 30 h ago", not "stale=true"). Freshness belongs here as a check with
-the threshold in your app, not as a raw "age" number that rises all day.
+words ("no success since 2026-10-21 23:10 UTC, expected daily", not "stale=true").
+Freshness belongs here as a check with the threshold in your app, not as a raw "age"
+number that rises all day.
+
+**Times in text are clock times, never ages.** A detail or summary is read minutes after
+it was written (beacon collects every minute, the hub polls every few), so "heartbeat 28 s
+ago" is wrong by the time anyone sees it. Write "last heartbeat 06:58 UTC" (or the date
+too when it's not today); the hub shows ages itself, from timestamps it can trust.
 
 **Headline numbers (`primary`).** At most 3 to 6 that answer "how did it go?" (for a
 fetch: new and changed records; for a report: readiness and findings). They're shown on
@@ -168,8 +174,9 @@ into a table: a row per thing, a column per key, plus the checks with the same l
 a status column. Keep it bounded: dozens of rows, not thousands. Never use user ids,
 request ids or timestamps as label values.
 
-**Units: `count`, `percent` (0 to 100), `bytes`, `s`, `ms`.** They decide formatting and
-axes everywhere. Report raw values in base units (bytes, not MB; seconds, not minutes).
+**Units: `count`, `percent` (0 to 100), `bytes`, `s`, `ms`, or a currency code (`usd`,
+`eur`: ISO 4217, lowercase).** They decide formatting and axes everywhere ($58.56, <$0.01).
+Report raw values in base units (bytes, not MB; seconds, not minutes; dollars, not cents).
 Anything else is shown after the value as-is.
 
 **Keys and labels.** Keys: lowercase, dotted, `thing.measure` (`records.new`, `db.size`),
