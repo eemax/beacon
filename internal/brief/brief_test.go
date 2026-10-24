@@ -31,6 +31,8 @@ func TestDerive(t *testing.T) {
 		{"producer summary", func() *spec.Component { c := fresh("x"); c.Summary = "16 files"; return c }, nil, OK, "16 files"},
 		{"last run ok", func() *spec.Component { return fresh("x") }, &spec.Run{Outcome: spec.Success, Summary: "fetched 12"}, OK, "fetched 12"},
 		{"unknown", func() *spec.Component { c := fresh("x"); c.Status = spec.Unknown; return c }, nil, Unknown, "the box can't tell"},
+		{"unknown, last run ok", func() *spec.Component { c := fresh("x"); c.Status = spec.Unknown; return c }, &spec.Run{Outcome: spec.Success, Summary: "done"}, Unknown, "done"},
+		{"last run ok without a summary", func() *spec.Component { c := fresh("x"); c.Summary = "16 files"; return c }, &spec.Run{Outcome: spec.Success}, OK, "last run succeeded"},
 		{"stale default 10m", func() *spec.Component { c := fresh("x"); c.UpdatedAt = now.Add(-13 * time.Minute); return c }, nil, Stale, "no update since 2026-10-24T11:47:00Z"},
 		{"stale own expect_every", func() *spec.Component {
 			c := fresh("x")
@@ -143,13 +145,13 @@ func TestWrite(t *testing.T) {
 		spec.Event{Type: "event", ID: "e1", At: now.Add(-3 * time.Hour), Kind: "deploy", Component: "fetch", Title: "v1.2", Detail: "fix\nretry backoff"},
 	)
 	var b strings.Builder
-	if err := Write(&b, Input{Source: "ysera", Components: []*spec.Component{backup, fetch, host}, Invalid: []spec.Invalid{{File: "bad.json", Error: "not valid"}}, Log: log, Now: now, Window: 24 * time.Hour}); err != nil {
+	if err := Write(&b, Input{Source: "ysera", Dir: "/data/components", Components: []*spec.Component{backup, fetch, host}, Invalid: []spec.Invalid{{File: "bad.json", Error: "not valid"}}, Log: log, Now: now, Window: 24 * time.Hour}); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()
 	want := []string{
 		"# ysera: 2 components need attention\n",
-		"beacon brief at 2026-10-24T12:00:00Z.",
+		"beacon brief at 2026-10-24T12:00:00Z. Times are UTC. More: `beacon log`, the files in /data/components/.\n",
 		// Problems first: fetch (fail) before backup and host.
 		"## Components\n\n- fail **fetch** (Nightly fetch): last run (2026-10-24T00:59:00Z) failed: TimeoutError: read timed out\n  - fail a: x\n  - warn b\n  - schedule: daily at 01:00; next run 2026-10-25T01:00:00Z\n",
 		"- ok **backup**: latest backup\n  - running since 2026-10-24T11:55:00Z (timer)\n",
@@ -164,6 +166,15 @@ func TestWrite(t *testing.T) {
 		if !strings.Contains(out, w) {
 			t.Errorf("missing %q in:\n%s", w, out)
 		}
+	}
+	// A run that started later but ended first is still the latest.
+	long := run("job", 2*time.Hour, spec.Failure, "long one")
+	long.StartedAt = now.Add(-5 * time.Hour)
+	short := run("job", 3*time.Hour, spec.Success, "short one")
+	b.Reset()
+	Write(&b, Input{Source: "x", Components: []*spec.Component{fresh("job")}, Log: raw(t, short, long), Now: now, Window: 24 * time.Hour})
+	if !strings.Contains(b.String(), "- ok **job**: short one") {
+		t.Errorf("latest should be the last to start:\n%s", b.String())
 	}
 	if strings.Contains(out, "too old") || strings.Contains(out, "run one") {
 		t.Errorf("runs outside the window or superseded successes shown:\n%s", out)

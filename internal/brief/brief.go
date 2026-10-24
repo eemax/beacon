@@ -91,13 +91,14 @@ func Derive(c *spec.Component, latest *spec.Run, now time.Time) Derived {
 		found = append(found, Derived{State(c.Status), cmp.Or(c.Summary, string(c.Status))})
 	}
 	if len(found) == 0 {
+		state, reason := OK, c.Summary
 		if c.Status == spec.Unknown {
-			return Derived{Unknown, cmp.Or(c.Summary, "the box can't tell")}
+			state, reason = Unknown, cmp.Or(c.Summary, "the box can't tell")
 		}
 		if latest != nil && latest.Outcome == spec.Success {
-			return Derived{OK, cmp.Or(latest.Summary, c.Summary, "last run succeeded")}
+			reason = cmp.Or(latest.Summary, "last run succeeded")
 		}
-		return Derived{OK, c.Summary}
+		return Derived{state, reason}
 	}
 	// Stable: of equally bad findings, the first one found wins (as in the hub).
 	slices.SortStableFunc(found, func(a, b Derived) int { return rank[b.State] - rank[a.State] })
@@ -132,6 +133,7 @@ func checkText(c spec.Check) string {
 // Input is everything a brief is made of.
 type Input struct {
 	Source     string
+	Dir        string // where the component files are, for the reader's next step
 	Components []*spec.Component
 	Invalid    []spec.Invalid
 	Log        []json.RawMessage // oldest first, as stored
@@ -182,9 +184,12 @@ const maxRecent = 40
 func Write(w io.Writer, in Input) error {
 	log := parseLog(in.Log)
 	latest := map[string]*spec.Run{}
+	// Latest = the last to start, as the hub picks it (runs are logged as they end).
 	for _, e := range log {
-		if e.run != nil {
-			latest[e.run.Component] = e.run
+		if r := e.run; r != nil {
+			if prev := latest[r.Component]; prev == nil || !r.StartedAt.Before(prev.StartedAt) {
+				latest[r.Component] = r
+			}
 		}
 	}
 	type row struct {
@@ -213,7 +218,7 @@ func Write(w io.Writer, in Input) error {
 	case problems > 1:
 		headline = fmt.Sprintf("%d components need attention", problems)
 	}
-	fmt.Fprintf(&b, "# %s: %s\n\nbeacon brief at %s. Times are UTC. More: `beacon log`, the files in /var/lib/beacon/components/.\n", in.Source, headline, stamp(in.Now))
+	fmt.Fprintf(&b, "# %s: %s\n\nbeacon brief at %s. Times are UTC. More: `beacon log`, the files in %s/.\n", in.Source, headline, stamp(in.Now), cmp.Or(in.Dir, "components"))
 
 	if len(rows) > 0 {
 		b.WriteString("\n## Components\n\n")

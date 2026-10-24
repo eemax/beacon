@@ -594,7 +594,7 @@ func cmdBrief(args []string) error {
 		return err
 	}
 	return brief.Write(os.Stdout, brief.Input{
-		Source: *source, Components: comps, Invalid: invalid, Log: entries, Now: time.Now(), Window: *since,
+		Source: *source, Dir: p.components(), Components: comps, Invalid: invalid, Log: entries, Now: time.Now(), Window: *since,
 	})
 }
 
