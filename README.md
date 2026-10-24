@@ -151,6 +151,15 @@ The built-in **`host`** component (Linux and macOS): load, memory, swap, disk, u
 pending reboot, with checks (warn at 85 % disk / 90 % memory, fail at 95 / 98).
 `BEACON_HOST_FEED=off` turns it off.
 
+## The box in short
+
+`beacon brief` prints the box as a short Markdown summary for people and AI agents working
+on it: each component's status with the reason (derived as the hub derives it, problems
+first), its headline numbers, what's running, the next scheduled runs, and the last day's
+runs and events (`--since 72h` for more). Times are RFC 3339 UTC. Point an agent's
+instructions at it ("for the box's current state, run `beacon brief`") instead of pasting
+status into its prompt.
+
 ## Install
 
 ### Linux (systemd)
@@ -206,6 +215,7 @@ beacon run <component> --json FILE|-   log a finished run from a JSON document
 beacon put <component> [flags]         write a component's state by hand
 beacon serve                           serve state and log (read-only HTTP API)
 beacon log [--after N] [--limit N]     print log entries
+beacon brief [--since 24h]             the box in short, as Markdown (for people and AI agents)
 beacon token add|list|revoke [NAME]
 beacon validate
 beacon version

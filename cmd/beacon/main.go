@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/eemax/beacon/internal/brief"
 	"github.com/eemax/beacon/internal/collect"
 	"github.com/eemax/beacon/internal/logbook"
 	"github.com/eemax/beacon/internal/server"
@@ -46,6 +47,7 @@ Usage:
   beacon put <component> [flags]         write a component's state by hand (ad-hoc)
   beacon serve                           serve state and log (read-only HTTP API)
   beacon log [--after N] [--limit N]     print log entries
+  beacon brief [--since 24h]             the box in short, as Markdown (for people and AI agents)
   beacon token add|list|revoke [NAME]    tokens that may read this box
   beacon validate                        check components, definitions and the log
   beacon version
@@ -68,7 +70,7 @@ func main() {
 	cmd, args := os.Args[1], os.Args[2:]
 	commands := map[string]func([]string) error{
 		"collect": cmdCollect, "exec": cmdExec, "event": cmdEvent, "run": cmdRun, "put": cmdPut,
-		"serve": cmdServe, "log": cmdLog, "token": cmdToken, "validate": cmdValidate,
+		"serve": cmdServe, "log": cmdLog, "brief": cmdBrief, "token": cmdToken, "validate": cmdValidate,
 	}
 	switch cmd {
 	case "version", "--version":
@@ -570,6 +572,30 @@ func cmdLog(args []string) error {
 		fmt.Println(string(e))
 	}
 	return err
+}
+
+func cmdBrief(args []string) error {
+	fs, p := newFlags("brief")
+	since := fs.Duration("since", 24*time.Hour, "how far back recent runs and events go")
+	hostname, _ := os.Hostname()
+	source := fs.String("source", env("BEACON_SOURCE", hostname), "this box's name")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 || *since <= 0 {
+		return usageError{"usage: beacon brief [--since 24h]"}
+	}
+	comps, invalid, err := spec.LoadComponents(p.components())
+	if err != nil {
+		return err
+	}
+	entries, _, _, err := logbook.Log{Path: p.log()}.Read(0, 1<<30)
+	if err != nil {
+		return err
+	}
+	return brief.Write(os.Stdout, brief.Input{
+		Source: *source, Components: comps, Invalid: invalid, Log: entries, Now: time.Now(), Window: *since,
+	})
 }
 
 func cmdToken(args []string) error {
