@@ -1,3 +1,4 @@
+# Managed by beacon install.sh (from deploy/): re-run it from the checkout to update.
 [Unit]
 Description=beacon collect, every minute
 
