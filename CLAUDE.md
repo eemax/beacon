@@ -13,6 +13,9 @@ step with SPEC.md and lookout's display rules.
 - No third-party dependencies without a good reason; it has to drop onto any box.
 - Before committing: `gofmt -l .` (empty), `go vet ./...`, `go test -race ./...`; also
   `GOOS=linux go vet ./...` (systemd and host code are per-OS).
-- Release: tag `vX.Y.Z` and push the tag; the release workflow builds the binaries.
+- Release: tag `vX.Y.Z` and push the tag; the release workflow builds the binaries. Tag only
+  when a box should get the change; bump the last number by default, the middle one for a named
+  feature, the first only for a breaking change and only on Max's say-so (his preferences,
+  Building → Versions).
 - Test systemd capture on a real box (ysera): cross-compile, copy to /tmp, run with
   `BEACON_DATA`/`BEACON_ETC` pointing at a temp dir, clean up after.
