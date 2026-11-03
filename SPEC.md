@@ -136,6 +136,24 @@ reused) and `type`.
 
 The box keeps the log for 90 days (at most 20,000 entries).
 
+## The built-in host component
+
+Every box has a component `host` (group `System`; Linux and macOS) for the box itself. Its
+gauges are load, memory, swap, disk and uptime, plus on Linux `units.failed` and `oom.kills`
+(since boot). Its checks, each read cheaply on every collect (once a minute):
+
+| Check | Where | ok | warn | fail |
+|---|---|---|---|---|
+| `disk` | all | below 85 % used | from 85 % | from 95 % |
+| `memory` | all | below 90 % used | from 90 % | from 98 % |
+| `units` | Linux (systemd) | no failed unit | a failed unit no component watches, named in the detail | — |
+| `oom` | Linux | no kernel OOM kill in the last 24 h | one or more in the last 24 h: how many, when the last was seen, what was killed when the kernel log says | — |
+| `reboot` | Linux (`/var/run/reboot-required`) | none pending, or pending for fewer than 3 nights | pending through 3 midnights (UTC) or more: the box's own reboots aren't happening | — |
+
+`units` leaves out the units a component's definition names (`systemd.units`, `systemd.timers`):
+their component already shows them failing. A reboot's `detail` gives when it became pending
+(RFC 3339) and the packages asking for it.
+
 ## HTTP API
 
 `beacon serve` listens on `127.0.0.1:7600` (in tunnel mode on the box's private tunnel
