@@ -83,7 +83,8 @@ Every field is optional. Shapes are in SPEC.md. beacon checks what adapters prin
 failing or invalid state adapter turns the component `fail` with the reason; a failing or
 invalid run adapter never costs the run (it's logged as systemd saw it, and the component
 warns until the adapter works again). A timer listed in the definition that isn't
-scheduled (stopped, disabled) is a warning too, since without it nothing can be missed.
+scheduled (stopped, disabled) is a warning too, since without it nothing can be missed
+(while the unit it starts is running, systemd shows no next run: that counts as scheduled).
 
 Adapters describe, the hub presents (SPEC.md → How a hub presents it): mark the headline
 numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that
@@ -148,7 +149,10 @@ beacon event note --title "ERP down for maintenance until 06:00"
 ### The host
 
 The built-in **`host`** component (Linux and macOS): load, memory, swap, disk, uptime,
-pending reboot, with checks (warn at 85 % disk / 90 % memory, fail at 95 / 98).
+with checks (warn at 85 % disk / 90 % memory, fail at 95 / 98). On Linux also: failed
+systemd units that no component watches (warn, by name), kernel OOM kills in the last 24 h
+(warn), and a pending reboot (`/var/run/reboot-required`: ok, warn once it has been
+pending through 3 midnights UTC). The levels are in SPEC.md → The built-in host component.
 `BEACON_HOST_FEED=off` turns it off.
 
 ## The box in short

@@ -206,20 +206,31 @@ func Run(ctx context.Context, cfg Config) (*Result, error) {
 		}
 	}
 
-	// The host.
+	defs, _ := Definitions(cfg.Definitions)
+
+	// The host. Units a definition names are left to their component.
 	if cfg.HostFeed && host.Supported {
-		c, err := host.Component(now)
+		owned := map[string]bool{}
+		for _, d := range defs {
+			if d.Systemd != nil {
+				for _, u := range append(slices.Clone(d.Systemd.Units), d.Systemd.Timers...) {
+					owned[u] = true
+				}
+			}
+		}
+		st, _ := statefile.Read(cfg.State)
+		c, memo, err := host.Component(now, host.Input{BootID: facts.BootID, Memo: st.Host, Owned: owned})
 		if err == nil {
 			err = spec.WriteComponent(cfg.Components, c)
 		}
 		if err != nil {
 			res.fail("host: %v", err)
 		} else {
+			statefile.Update(cfg.State, func(s *statefile.State) error { s.Host = memo; return nil })
 			res.Updated = append(res.Updated, "host")
 		}
 	}
 
-	defs, _ := Definitions(cfg.Definitions)
 	var timers []systemd.Timer
 	needTimers := false
 	for _, d := range defs {
@@ -338,6 +349,7 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 	}
 	var notes []string
 	var services []systemd.Unit
+	shown := map[string]systemd.Unit{} // the units looked at, for the timers below
 
 	// systemd: a job's new invocations become runs, one in progress becomes `running`;
 	// services are looked at below.
@@ -354,6 +366,7 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 				notes = append(notes, err.Error())
 				continue
 			}
+			shown[name] = u
 			if !u.Job() {
 				services = append(services, u)
 				continue
@@ -398,16 +411,21 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 			}
 		}
 		if d.Systemd != nil && systemd.Supported {
-			for _, want := range d.Systemd.Timers {
-				scheduled := false
-				for _, t := range timers {
-					if t.Unit == want && !t.Next.IsZero() {
-						scheduled = true
-						if s.NextAt == nil || t.Next.Before(*s.NextAt) {
-							next := t.Next
-							s.NextAt = &next
-						}
+			running := func(unit string) bool {
+				u, ok := shown[unit]
+				if !ok {
+					var err error
+					if u, err = systemd.Show(unit); err != nil {
+						return false
 					}
+					shown[unit] = u
+				}
+				return u.Running()
+			}
+			for _, want := range d.Systemd.Timers {
+				next, scheduled := timerNext(want, timers, running)
+				if !next.IsZero() && (s.NextAt == nil || next.Before(*s.NextAt)) {
+					s.NextAt = &next
 				}
 				// Without this, a stopped or disabled timer would just make the schedule
 				// disappear, and with it the hub's "missed".
@@ -608,6 +626,29 @@ func serviceState(cfg Config, d *Definition, units []systemd.Unit, now time.Time
 		return up[0] + " is up"
 	}
 	return strings.Join(up, ", ") + " are up"
+}
+
+// timerNext is a timer's next elapse, and whether it's scheduled at all. While the unit it
+// starts is running, systemd shows no next elapse (it computes one when the run ends):
+// that timer is scheduled, just without a next_at for now.
+func timerNext(want string, timers []systemd.Timer, running func(unit string) bool) (time.Time, bool) {
+	var next time.Time
+	scheduled := false
+	for _, t := range timers {
+		if t.Unit != want {
+			continue
+		}
+		switch {
+		case !t.Next.IsZero():
+			scheduled = true
+			if next.IsZero() || t.Next.Before(next) {
+				next = t.Next
+			}
+		case t.Activates != "" && running(t.Activates):
+			scheduled = true
+		}
+	}
+	return next, scheduled
 }
 
 func trigger(d *Definition, u systemd.Unit, timers []systemd.Timer) string {

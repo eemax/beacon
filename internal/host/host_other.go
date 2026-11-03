@@ -5,6 +5,7 @@ package host
 import (
 	"errors"
 	"runtime"
+	"time"
 )
 
 const Supported = false
@@ -14,3 +15,5 @@ func read() (sample, error) {
 }
 
 func ReadFacts() Facts { return Facts{Arch: runtime.GOARCH} }
+
+func oomVictims(time.Time) []string { return nil }

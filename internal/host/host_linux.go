@@ -4,9 +4,12 @@ package host
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -45,9 +48,64 @@ func read() (sample, error) {
 	if s.uptime, err = uptime(); err != nil {
 		return s, err
 	}
-	_, err = os.Stat("/var/run/reboot-required")
-	s.rebootPending = err == nil
+	s.rebootKnown = true
+	if fi, err := os.Stat("/var/run/reboot-required"); err == nil {
+		s.rebootPending, s.rebootAt = true, fi.ModTime()
+		if data, err := os.ReadFile("/var/run/reboot-required.pkgs"); err == nil {
+			for _, p := range strings.Fields(string(data)) {
+				if len(s.rebootPkgs) < 10 && !slices.Contains(s.rebootPkgs, p) {
+					s.rebootPkgs = append(s.rebootPkgs, p)
+				}
+			}
+		}
+	}
+	s.oomKills, s.oomKnown = vmstat("oom_kill")
+	s.failedUnits, s.unitsKnown = failedUnits()
 	return s, nil
+}
+
+// vmstat reads one counter from /proc/vmstat (oom_kill: since kernel 4.13).
+func vmstat(key string) (uint64, bool) {
+	data, err := os.ReadFile("/proc/vmstat")
+	if err != nil {
+		return 0, false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(line, key+" "); ok {
+			n, err := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
+			return n, err == nil
+		}
+	}
+	return 0, false
+}
+
+// command runs a quick read-only command (systemctl, journalctl) with a timeout.
+func command(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Output()
+}
+
+// failedUnits lists the units systemd has failed (any type); false without systemd.
+func failedUnits() ([]string, bool) {
+	if _, err := os.Stat("/run/systemd/system"); err != nil {
+		return nil, false
+	}
+	out, err := command("systemctl", "list-units", "--state=failed", "--all", "--plain", "--no-legend", "--no-pager")
+	if err != nil {
+		return nil, false
+	}
+	return parseUnits(string(out)), true
+}
+
+// oomVictims reads which processes the kernel log says the OOM killer killed since then
+// (only when the counter went up, so rarely).
+func oomVictims(since time.Time) []string {
+	out, err := command("journalctl", "-k", "-q", "--no-pager", "-o", "cat", "-n", "50", "--since", "@"+strconv.FormatInt(since.Unix(), 10), "-g", "Killed process")
+	if err != nil && len(out) == 0 {
+		return nil
+	}
+	return parseVictims(string(out))
 }
 
 func meminfo() (map[string]float64, error) {

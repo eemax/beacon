@@ -40,6 +40,23 @@ type State struct {
 	// warning on the component: the run was logged without its stats).
 	RunAdapter map[string]string  `json:"run_adapter,omitempty"`
 	Services   map[string]Service `json:"services,omitempty"` // service unit → last seen
+	Host       Host               `json:"host,omitzero"`
+}
+
+// Host is what the host component's checks remember between collects.
+type Host struct {
+	Boot     string    `json:"boot,omitempty"`      // the boot OOMKills was read in
+	OOMKills uint64    `json:"oom_kills,omitempty"` // /proc/vmstat oom_kill at the last collect
+	OOM      []OOMKill `json:"oom,omitempty"`       // kills seen in the last 24 h
+	// When /var/run/reboot-required was first seen (this boot); zero while none is pending.
+	RebootSince time.Time `json:"reboot_since,omitzero"`
+}
+
+// OOMKill is a collect that saw the kernel's OOM killer counter go up.
+type OOMKill struct {
+	At      time.Time `json:"at"`
+	Count   uint64    `json:"count"`
+	Victims []string  `json:"victims,omitempty"` // "python3 (pid 1234)", from the kernel log
 }
 
 func read(path string) (State, error) {

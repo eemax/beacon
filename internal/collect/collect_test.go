@@ -292,3 +292,25 @@ func TestStateEvery(t *testing.T) {
 		t.Fatal("state_every without a state adapter accepted")
 	}
 }
+
+func TestTimerNext(t *testing.T) {
+	next := time.Date(2026, 11, 3, 10, 10, 0, 0, time.UTC)
+	timers := []systemd.Timer{
+		{Unit: "notes-mirror.timer", Activates: "notes-mirror.service"}, // its run in progress: no next elapse
+		{Unit: "backup.timer", Activates: "backup.service", Next: next},
+		{Unit: "stopped.timer", Activates: "stopped.service"},
+	}
+	running := func(u string) bool { return u == "notes-mirror.service" }
+	if n, ok := timerNext("notes-mirror.timer", timers, running); !ok || !n.IsZero() {
+		t.Errorf("running: %v %v", n, ok)
+	}
+	if n, ok := timerNext("backup.timer", timers, running); !ok || !n.Equal(next) {
+		t.Errorf("scheduled: %v %v", n, ok)
+	}
+	if _, ok := timerNext("stopped.timer", timers, running); ok {
+		t.Error("a stopped timer whose unit isn't running counts as scheduled")
+	}
+	if _, ok := timerNext("missing.timer", timers, running); ok {
+		t.Error("a missing timer counts as scheduled")
+	}
+}

@@ -130,3 +130,5 @@ func ReadFacts() Facts {
 	}
 	return f
 }
+
+func oomVictims(time.Time) []string { return nil }
