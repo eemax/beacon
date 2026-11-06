@@ -313,6 +313,9 @@ func Write(w io.Writer, in Input) error {
 		if ev.Component != "" {
 			fmt.Fprintf(&b, " **%s**", ev.Component)
 		}
+		if a := ev.Actor; a != nil {
+			fmt.Fprintf(&b, " by %s %s", a.Kind, oneLine(a.Name))
+		}
 		fmt.Fprintf(&b, ": %s", oneLine(ev.Title))
 		if ev.Detail != "" {
 			fmt.Fprintf(&b, ": %s", clip(oneLine(ev.Detail), 200))

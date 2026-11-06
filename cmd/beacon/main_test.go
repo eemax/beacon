@@ -101,3 +101,89 @@ func TestEventAndRunCommands(t *testing.T) {
 		t.Fatalf("entries: %s", entries)
 	}
 }
+
+func TestEventActorAndLinks(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("BEACON_DATA", dir)
+	t.Setenv("BEACON_ETC", dir)
+	logPath := filepath.Join(dir, "log.jsonl")
+	if err := cmdEvent([]string{"change", "--title", "rotated the API key", "--actor-kind", "agent", "--actor", "acmd",
+		"--ref", "commit=commit:abc123", "--link", "Diff=https://example.com/c?a=1", "--ref", "chat=conversation:main:42"}); err != nil {
+		t.Fatal(err)
+	}
+	entries, _, _, _ := logbook.Log{Path: logPath}.Read(0, 10)
+	if len(entries) != 1 {
+		t.Fatalf("entries: %s", entries)
+	}
+	var e spec.Event
+	if err := spec.Decode(entries[0], &e); err != nil {
+		t.Fatal(err)
+	}
+	want := []spec.EventLink{
+		{Title: "commit", Ref: &spec.Ref{Kind: "commit", ID: "abc123"}},
+		{Title: "Diff", URL: "https://example.com/c?a=1"},
+		{Title: "chat", Ref: &spec.Ref{Kind: "conversation", ID: "main:42"}},
+	}
+	if e.Kind != "change" || !reflect.DeepEqual(e.Actor, &spec.Actor{Kind: "agent", Name: "acmd"}) || !reflect.DeepEqual(e.Links, want) {
+		t.Fatalf("event: %+v", e)
+	}
+	// Without the new flags an event carries neither field.
+	if err := cmdEvent([]string{"note", "--title", "plain"}); err != nil {
+		t.Fatal(err)
+	}
+	entries, _, _, _ = logbook.Log{Path: logPath}.Read(1, 10)
+	if s := string(entries[0]); strings.Contains(s, "actor") || strings.Contains(s, "links") {
+		t.Fatalf("plain event: %s", s)
+	}
+
+	tooMany := []string{"deploy", "--title", "x"}
+	for i := 0; i < 11; i++ {
+		tooMany = append(tooMany, "--link", "l=https://example.com/")
+	}
+	refused := map[string][]string{
+		"go together":          {"deploy", "--title", "x", "--actor", "acmd"},
+		"go together ":         {"deploy", "--title", "x", "--actor-kind", "agent"},
+		"actor.kind":           {"deploy", "--title", "x", "--actor-kind", "robot", "--actor", "r2"},
+		"actor.name: 101":      {"deploy", "--title", "x", "--actor-kind", "person", "--actor", strings.Repeat("n", 101)},
+		"links: 11, at most":   tooMany,
+		"want title=url":       {"deploy", "--title", "x", "--link", "https://example.com"},
+		"want title=kind:id":   {"deploy", "--title", "x", "--ref", "commit=abc123"},
+		"ref.kind":             {"deploy", "--title", "x", "--ref", "PR=pr:12"},
+		"ref.id: 201":          {"deploy", "--title", "x", "--ref", "c=commit:" + strings.Repeat("i", 201)},
+		"links[0].title: 101":  {"deploy", "--title", "x", "--ref", strings.Repeat("t", 101) + "=commit:abc"},
+		"links[0].url":         {"deploy", "--title", "x", "--link", "l=ftp://example.com"},
+		"links[0].title: requ": {"deploy", "--title", "x", "--link", "=https://example.com"},
+		"usage":                {"deploy", "--title", "x", "stray"},
+	}
+	for want, args := range refused {
+		if err := cmdEvent(args); err == nil || !strings.Contains(err.Error(), strings.TrimSpace(want)) {
+			t.Errorf("%v: got %v, want %q", args, err, want)
+		}
+	}
+	if _, _, last, _ := (logbook.Log{Path: logPath}).Read(0, 100); last != 2 {
+		t.Fatalf("refused events were logged: last seq %d", last)
+	}
+}
+
+func TestValidateOldAndNewEvents(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("BEACON_DATA", dir)
+	t.Setenv("BEACON_ETC", dir)
+	logPath := filepath.Join(dir, "log.jsonl")
+	old := `{"seq":1,"type":"event","id":"a1","at":"2026-10-22T00:00:41Z","kind":"deploy","title":"v1"}` + "\n"
+	os.WriteFile(logPath, []byte(old), 0o644)
+	os.WriteFile(logPath+".seq", []byte("2\n"), 0o644)
+	if err := cmdEvent([]string{"change", "--title", "t", "--actor-kind", "unit", "--actor", "renew.service", "--ref", "a=alert:9"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdValidate(nil); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	bad := `{"seq":3,"type":"event","id":"a3","at":"2026-10-22T00:00:41Z","kind":"change","title":"t","actor":{"kind":"robot","name":"x"}}` + "\n"
+	f, _ := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0)
+	f.WriteString(bad)
+	f.Close()
+	if err := cmdValidate(nil); err == nil {
+		t.Fatal("validate passed an event with a bad actor")
+	}
+}

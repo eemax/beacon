@@ -6,8 +6,9 @@ beacon knows the box's **components**: the things you care about on it (a nightl
 integration, a report job, a backup, the host itself). For each it keeps the **state**
 (gauges, checks, the schedule, a run in progress) and an append-only **log** of every
 **run** (outcome, duration, exit code, the error, per-run stats) and **event** (reboots,
-deploys, config changes, notes). A hub ([lookout](https://github.com/eemax/lookout)) polls
-every box's beacon, keeps the history, draws the dashboard and sends the alerts. The box
+deploys, config and other changes, notes; who made a change and what it points to). A hub
+([lookout](https://github.com/eemax/lookout)) polls every box's beacon, keeps the history,
+draws the dashboard and sends the alerts. The box
 needs no credentials for anything outside itself and accepts no writes from outside.
 
 ```
@@ -15,7 +16,7 @@ needs no credentials for anything outside itself and accepts no writes from outs
  │ systemd units, timers ──────┐                                            │
  │ adapters (components.d) ────┼─▶ beacon collect ─▶ components/*.json ──┐  │
  │ beacon exec (launchd, cron) ┘   (every minute)    log.jsonl ──────────┼─▶ beacon serve
- │ beacon event deploy|config|note ─────────────────────────────────────┘  │  (read-only)
+ │ beacon event deploy|config|change|note ──────────────────────────────┘  │  (read-only)
  └──────────────────────────────────────────────────────────────────────────│─┘
                                                 Cloudflare Tunnel (outbound only)
                                                                             │
@@ -144,7 +145,17 @@ Reboots are logged by `beacon collect` (a new boot id). Log the rest where they 
 beacon event deploy --component nightly-sync --title "v1.4.2" --detail "fix retry backoff"
 beacon event config --title "raised the API quota"
 beacon event note --title "ERP down for maintenance until 06:00"
+beacon event change --title "rotated the ERP API key" --actor-kind person --actor max
+beacon event deploy --component nightly-sync --title "v1.4.3" \
+  --actor-kind agent --actor deploy-bot --ref "Commit=commit:4e1a2b7" \
+  --link "Changes=https://example.com/compare/v1.4.2...v1.4.3"
 ```
+
+`change` is a change to the box's setup that isn't a deploy or a config change (a key
+rotated, an access allowed, a rule edited). `--actor-kind person|agent|unit --actor NAME`
+says who made it; `--link TITLE=URL` and `--ref TITLE=KIND:ID` (kind `commit`, `alert`,
+`incident`, `conversation` or `other`) say what it points to, at most 10 together. A value
+over its limit (SPEC.md → Event) is refused, never cut short.
 
 ### The host
 
@@ -214,7 +225,8 @@ Wrap launchd jobs in `beacon exec` (in their `ProgramArguments`) to log their ru
 ```
 beacon collect [-v]                    update components and log new runs (every minute)
 beacon exec <component> [--trigger T] -- <command> [args]
-beacon event deploy|config|note --title T [--component C] [--detail D]
+beacon event deploy|config|change|note --title T [--component C] [--detail D]
+             [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]...
 beacon run <component> --json FILE|-   log a finished run from a JSON document
 beacon put <component> [flags]         write a component's state by hand
 beacon serve                           serve state and log (read-only HTTP API)
