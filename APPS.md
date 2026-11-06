@@ -21,7 +21,8 @@ People look at a hub (lookout) that answers, in this order:
 
 Each box runs **beacon**, which turns the box into **components** (the things you care
 about: "Centric fetch", "Nightly backup"). Each one has **runs** (every execution of its
-job), **state** (what it is now) and **events** (deploys, reboots, notes). The hub draws
+job), **state** (what it is now) and **events** (deploys, reboots, changes, notes; each
+can say who made it and link to what it's about). The hub draws
 every component the same way, from what the data says about itself. There is no per-app
 dashboard code anywhere.
 
@@ -203,11 +204,20 @@ The installer that deploys your app (not the app itself) logs a deploy event, so
 line up with what happened on the timeline:
 
 ```bash
-command -v beacon >/dev/null && beacon event deploy --component <id> \
-  --title "<app> $(git rev-parse --short HEAD)" --detail "$(git log -1 --format=%s)" || true
+if command -v beacon >/dev/null; then
+  title="<app> $(git rev-parse --short HEAD)" detail="$(git log -1 --format=%s)"
+  beacon event deploy --component <id> --title "$title" --detail "$detail" \
+      --actor-kind agent --actor "<who deployed>" --ref "Commit=commit:$(git rev-parse HEAD)" 2>/dev/null ||
+    beacon event deploy --component <id> --title "$title" --detail "$detail" || true
+fi
 ```
 
-Log it only when the version actually changed.
+Log it only when the version actually changed. `--actor-kind person|agent|unit --actor
+<name>` says who deployed, `--ref` and `--link "Changes=<url>"` what it points to, so a hub
+can show "deployed by …" next to what broke after it, and a feed of who changed what. They
+need beacon v2.6.0 or later: on an older beacon the first command fails on the new flags
+and the second logs the same event without them, so the deploy is never lost. Other changes to the box's setup (a key rotated, an access
+allowed, a rule edited) are `beacon event change`, with the same flags.
 
 ## From app to hub: an example
 

@@ -104,3 +104,23 @@ func TestLog(t *testing.T) {
 		t.Fatal("healthz")
 	}
 }
+
+func TestLogServesActorAndLinks(t *testing.T) {
+	ts, tok, dir := setup(t)
+	e := &spec.Event{Type: "event", ID: "e9", At: time.Date(2026, 11, 6, 9, 0, 0, 0, time.UTC), Kind: "change", Title: "rotated the key",
+		Actor: &spec.Actor{Kind: "agent", Name: "acmd"},
+		Links: []spec.EventLink{{Title: "commit", Ref: &spec.Ref{Kind: "commit", ID: "abc123"}}, {Title: "Diff", URL: "https://example.com/d"}}}
+	if _, err := (logbook.Log{Path: filepath.Join(dir, "log.jsonl")}).Append(e); err != nil {
+		t.Fatal(err)
+	}
+	r := get(t, ts.URL+"/v2/log?after=3", tok)
+	var body struct {
+		Entries []json.RawMessage `json:"entries"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	want := `{"seq":4,"type":"event","id":"e9","at":"2026-11-06T09:00:00Z","kind":"change","title":"rotated the key",` +
+		`"actor":{"kind":"agent","name":"acmd"},"links":[{"title":"commit","ref":{"kind":"commit","id":"abc123"}},{"title":"Diff","url":"https://example.com/d"}]}`
+	if len(body.Entries) != 1 || string(body.Entries[0]) != want {
+		t.Fatalf("entries:\n got %s\nwant %s", body.Entries, want)
+	}
+}

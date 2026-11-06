@@ -143,6 +143,8 @@ func TestWrite(t *testing.T) {
 		run("backup", 2*time.Hour, spec.Success, "latest backup"),
 		failedRun,
 		spec.Event{Type: "event", ID: "e1", At: now.Add(-3 * time.Hour), Kind: "deploy", Component: "fetch", Title: "v1.2", Detail: "fix\nretry backoff"},
+		spec.Event{Type: "event", ID: "e2", At: now.Add(-4 * time.Hour), Kind: "change", Title: "rotated the API key",
+			Actor: &spec.Actor{Kind: "agent", Name: "acmd"}, Links: []spec.EventLink{{Title: "Commit", Ref: &spec.Ref{Kind: "commit", ID: "abc123"}}}},
 	)
 	var b strings.Builder
 	if err := Write(&b, Input{Source: "ysera", Dir: "/data/components", Components: []*spec.Component{backup, fetch, host}, Invalid: []spec.Invalid{{File: "bad.json", Error: "not valid"}}, Log: log, Now: now, Window: 24 * time.Hour}); err != nil {
@@ -160,6 +162,7 @@ func TestWrite(t *testing.T) {
 		"## Recent (since 2026-10-23T12:00:00Z, newest first)\n\n",
 		"- 2026-10-24T10:00:00Z run **backup** success after 1m00s (timer): latest backup (+2 earlier successful runs)\n",
 		"- 2026-10-24T09:00:00Z deploy **fetch**: v1.2: fix retry backoff\n",
+		"- 2026-10-24T08:00:00Z change by agent acmd: rotated the API key\n",
 		"- 2026-10-24T01:00:00Z run **fetch** failure after 1m00s (timer), exit 1: TimeoutError: read timed out\n",
 	}
 	for _, w := range want {

@@ -114,24 +114,54 @@ type Run struct {
 
 type EventKind string
 
-// Event is a reboot, deploy, config change, note, or a service that crashed or failed
-// (a log entry).
+// Actor is who made a change: a person, an agent (an AI agent or automation acting for
+// someone) or a unit (a systemd unit or job).
+type Actor struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+// Ref names a thing that lives elsewhere and has no URL of its own (a commit, an alert).
+type Ref struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// EventLink is what an event points to: a URL or a ref, exactly one of them.
+type EventLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url,omitempty"`
+	Ref   *Ref   `json:"ref,omitempty"`
+}
+
+// Event is a reboot, deploy, config change, other change, note, or a service that crashed
+// or failed (a log entry).
 type Event struct {
-	Seq       int64     `json:"seq,omitempty"`
-	Type      string    `json:"type"` // "event"
-	ID        string    `json:"id"`
-	At        time.Time `json:"at"`
-	Kind      EventKind `json:"kind"`
-	Component string    `json:"component,omitempty"`
-	Title     string    `json:"title"`
-	Detail    string    `json:"detail,omitempty"`
+	Seq       int64       `json:"seq,omitempty"`
+	Type      string      `json:"type"` // "event"
+	ID        string      `json:"id"`
+	At        time.Time   `json:"at"`
+	Kind      EventKind   `json:"kind"`
+	Component string      `json:"component,omitempty"`
+	Title     string      `json:"title"`
+	Detail    string      `json:"detail,omitempty"`
+	Actor     *Actor      `json:"actor,omitempty"`
+	Links     []EventLink `json:"links,omitempty"`
 }
 
 var (
 	namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 	idPattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
 	Triggers    = map[string]bool{"timer": true, "manual": true, "boot": true, "dependency": true, "other": true}
-	Kinds       = map[EventKind]bool{"reboot": true, "deploy": true, "config": true, "note": true, "service": true}
+	Kinds       = map[EventKind]bool{"reboot": true, "deploy": true, "config": true, "note": true, "service": true, "change": true}
+	ActorKinds  = map[string]bool{"person": true, "agent": true, "unit": true}
+	RefKinds    = map[string]bool{"commit": true, "alert": true, "incident": true, "conversation": true, "other": true}
+)
+
+const (
+	MaxEventLinks = 10
+	maxActorName  = 100
+	maxRefID      = 200
 )
 
 // ValidName reports whether s can be a component id, metric key or label name.
@@ -247,8 +277,72 @@ func (p *problems) links(field string, ls []Link) {
 			p.add("%s.title: required", at)
 		}
 		p.long(at+".title", l.Title, 100)
-		if !(strings.HasPrefix(l.URL, "https://") || strings.HasPrefix(l.URL, "http://")) || len(l.URL) > 500 || strings.ContainsAny(l.URL, " \t\n") {
-			p.add("%s.url: must be an http(s) URL of at most 500 characters", at)
+		p.url(at, l.URL)
+	}
+}
+
+// url checks an http(s) URL with a host, at most 500 characters (code points, like
+// every length in SPEC).
+func (p *problems) url(at, u string) {
+	if !(strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")) || len([]rune(u)) > 500 ||
+		strings.ContainsAny(u, " \t\n") || !hasHost(u) {
+		p.add("%s.url: must be an http(s) URL with a host, of at most 500 characters", at)
+	}
+}
+
+// hasHost reports whether an http(s) URL names a host: the authority after "://" (up to
+// the first / ? or #), past any userinfo@, is neither empty nor only a :port. Deliberately
+// not url.Parse: links beacon v2.5.0 accepted (an unencoded %, a bad port) stay valid.
+func hasHost(u string) bool {
+	_, rest, _ := strings.Cut(u, "://")
+	authority := rest
+	if i := strings.IndexAny(rest, "/?#"); i >= 0 {
+		authority = rest[:i]
+	}
+	if i := strings.LastIndex(authority, "@"); i >= 0 {
+		authority = authority[i+1:]
+	}
+	return authority != "" && !strings.HasPrefix(authority, ":")
+}
+
+func (p *problems) actor(a *Actor) {
+	if a == nil {
+		return
+	}
+	if !ActorKinds[a.Kind] {
+		p.add("actor.kind: %q is not one of person, agent, unit", a.Kind)
+	}
+	if strings.TrimSpace(a.Name) == "" {
+		p.add("actor.name: required")
+	}
+	p.long("actor.name", a.Name, maxActorName)
+}
+
+func (p *problems) eventLinks(ls []EventLink) {
+	if len(ls) > MaxEventLinks {
+		p.add("links: %d, at most %d", len(ls), MaxEventLinks)
+	}
+	for i, l := range ls {
+		at := fmt.Sprintf("links[%d]", i)
+		if strings.TrimSpace(l.Title) == "" {
+			p.add("%s.title: required", at)
+		}
+		p.long(at+".title", l.Title, 100)
+		switch {
+		case l.URL != "" && l.Ref != nil:
+			p.add("%s: has both url and ref, give exactly one", at)
+		case l.URL == "" && l.Ref == nil:
+			p.add("%s: needs a url or a ref", at)
+		case l.Ref != nil:
+			if !RefKinds[l.Ref.Kind] {
+				p.add("%s.ref.kind: %q is not one of commit, alert, incident, conversation, other", at, l.Ref.Kind)
+			}
+			if strings.TrimSpace(l.Ref.ID) == "" {
+				p.add("%s.ref.id: required", at)
+			}
+			p.long(at+".ref.id", l.Ref.ID, maxRefID)
+		default:
+			p.url(at, l.URL)
 		}
 	}
 }
@@ -337,7 +431,7 @@ func (e *Event) Validate() error {
 		p.add("at: required")
 	}
 	if !Kinds[e.Kind] {
-		p.add("kind: must be reboot, deploy, config, note or service")
+		p.add("kind: must be reboot, deploy, config, note, service or change")
 	}
 	if e.Component != "" && !ValidName(e.Component) {
 		p.add("component: %q is not a valid id", e.Component)
@@ -347,6 +441,8 @@ func (e *Event) Validate() error {
 	}
 	p.long("title", e.Title, 200)
 	p.long("detail", e.Detail, 2000)
+	p.actor(e.Actor)
+	p.eventLinks(e.Links)
 	return p.err()
 }
 

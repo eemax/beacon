@@ -41,7 +41,8 @@ Usage:
   beacon collect                         update components and log new runs (every minute)
   beacon exec <component> [--trigger T] -- <command> [args]
                                          run a command and log it as a run of <component>
-  beacon event deploy|config|note --title T [--component C] [--detail D]
+  beacon event deploy|config|change|note --title T [--component C] [--detail D]
+               [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]...
                                          log an event (reboots are detected by collect)
   beacon run <component> --json FILE|-   log a finished run from a JSON document
   beacon put <component> [flags]         write a component's state by hand (ad-hoc)
@@ -291,22 +292,55 @@ func truncate(s string, max int) string {
 
 // ---------------------------------------------------------------- event, run
 
+const eventUsage = "usage: beacon event deploy|config|change|note --title T [--component C] [--detail D] " +
+	"[--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]..."
+
 func cmdEvent(args []string) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return usageError{"usage: beacon event deploy|config|note --title T [--component C] [--detail D]"}
+		return usageError{eventUsage}
 	}
 	fs, p := newFlags("event " + args[0])
 	title := fs.String("title", "", "what happened, in a few words")
 	component := fs.String("component", "", "the component it's about (default: the whole box)")
 	detail := fs.String("detail", "", "more about it")
+	actorKind := fs.String("actor-kind", "", "who made the change: person, agent or unit (with --actor)")
+	actorName := fs.String("actor", "", "the name of who made the change (with --actor-kind)")
+	var links []spec.EventLink // in the order given, --link and --ref mixed
+	fs.Func("link", "title=url: what it points to (repeatable; at most 10 links and refs)", func(v string) error {
+		t, u, ok := strings.Cut(v, "=")
+		if !ok {
+			return errors.New("want title=url")
+		}
+		links = append(links, spec.EventLink{Title: t, URL: u})
+		return nil
+	})
+	fs.Func("ref", "title=kind:id, kind commit, alert, incident, conversation or other (repeatable)", func(v string) error {
+		t, ref, ok := strings.Cut(v, "=")
+		k, id, ok2 := strings.Cut(ref, ":")
+		if !ok || !ok2 {
+			return errors.New("want title=kind:id")
+		}
+		links = append(links, spec.EventLink{Title: t, Ref: &spec.Ref{Kind: k, ID: id}})
+		return nil
+	})
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
+	}
+	if fs.NArg() > 0 {
+		return usageError{eventUsage}
 	}
 	kind := spec.EventKind(args[0])
 	if kind == "reboot" || kind == "service" {
 		return usageError{"reboots and service crashes are logged by beacon collect"}
 	}
 	e := &spec.Event{Type: "event", ID: collect.NewID(), At: time.Now().UTC().Truncate(time.Second), Kind: kind, Component: *component, Title: *title, Detail: *detail}
+	if (*actorKind == "") != (*actorName == "") {
+		return usageError{"--actor-kind and --actor go together"}
+	}
+	if *actorKind != "" {
+		e.Actor = &spec.Actor{Kind: *actorKind, Name: *actorName}
+	}
+	e.Links = links
 	if err := os.MkdirAll(p.data, 0o755); err != nil {
 		return err
 	}
