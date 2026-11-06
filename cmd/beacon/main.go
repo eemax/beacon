@@ -42,7 +42,7 @@ Usage:
   beacon exec <component> [--trigger T] -- <command> [args]
                                          run a command and log it as a run of <component>
   beacon event deploy|config|change|note --title T [--component C] [--detail D]
-               [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL] [--ref TITLE=KIND:ID]
+               [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]...
                                          log an event (reboots are detected by collect)
   beacon run <component> --json FILE|-   log a finished run from a JSON document
   beacon put <component> [flags]         write a component's state by hand (ad-hoc)
@@ -335,7 +335,7 @@ func cmdEvent(args []string) error {
 	}
 	e := &spec.Event{Type: "event", ID: collect.NewID(), At: time.Now().UTC().Truncate(time.Second), Kind: kind, Component: *component, Title: *title, Detail: *detail}
 	if (*actorKind == "") != (*actorName == "") {
-		return usageError{"beacon event: --actor-kind and --actor go together"}
+		return usageError{"--actor-kind and --actor go together"}
 	}
 	if *actorKind != "" {
 		e.Actor = &spec.Actor{Kind: *actorKind, Name: *actorName}
