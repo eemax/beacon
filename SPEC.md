@@ -37,7 +37,9 @@ appear once per list.
 **Check:** `name` (at most 100), `status` (`ok`, `warn`, `fail`, `unknown`), optional
 `detail` (at most 500) and `labels`.
 
-**Link:** `title` (at most 100) and `url` (`http(s)://`, at most 500).
+**Link:** `title` (at most 100) and `url` (`http(s)://` with a host, at most 500).
+
+**Lengths** ("at most 100") count Unicode code points, not bytes.
 
 **Times** are RFC 3339 strings; **durations** are like `90s`, `5m`, `26h`, `1h30m`. A time
 inside free text (a summary, a check's detail, an error) is also written as RFC 3339 UTC
@@ -139,7 +141,7 @@ reused) and `type`.
 | `title` | yes | at most 200 |
 | `detail` | no | at most 2000 |
 | `actor` | no | who made the change: `kind` (`person` a human, `agent` an AI agent or automation acting for someone, `unit` a systemd unit or job) and `name` (at most 100). Leave it out when nobody did (a reboot, a crash) or nobody knows |
-| `links` | no | at most 10: what the event points to, each with a `title` (at most 100) and exactly one of `url` (`http(s)://`, at most 500) or `ref` (`kind`: `commit`, `alert`, `incident`, `conversation` or `other`; `id`: at most 200), for things that live elsewhere and have no URL of their own |
+| `links` | no | at most 10: what the event points to, each with a `title` (at most 100) and exactly one of `url` (`http(s)://` with a host, at most 500) or `ref` (`kind`: `commit`, `alert`, `incident`, `conversation` or `other`; `id`: at most 200), for things that live elsewhere and have no URL of their own |
 
 A ref names a thing in the producer's world (a commit hash, a hub's alert or incident id, an
 agent's conversation); a hub that knows where such things live may turn it into a link, and
@@ -223,7 +225,9 @@ can note).
 
 `schema` changes only when a reader would break. New optional fields, and new values of an
 enumeration such as an event's `kind`, may appear within schema 2: a hub shows a kind it
-doesn't know as it is, and ignores fields it doesn't know. v1 (`/v1/feeds`, feed documents)
+doesn't know as it is, and ignores fields it doesn't know. An event kind is always a token,
+`[a-z][a-z0-9-]{0,31}`: a hub accepts any such token and shows an unknown one as it is,
+while beacon writes only the kinds listed under Event. v1 (`/v1/feeds`, feed documents)
 was replaced by this in beacon v2.0.0.
 
 Within schema 2: events' `actor` and `links`, and the `change` kind, since beacon v2.6.0.

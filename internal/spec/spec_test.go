@@ -2,8 +2,10 @@ package spec
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -157,5 +159,49 @@ func TestOldEventsStillValid(t *testing.T) {
 	}
 	if err := Decode([]byte(`{"type":"event","actor":{"kind":"agent","name":"a","email":"x"}}`), &Event{}); err == nil {
 		t.Fatal("unknown actor field accepted")
+	}
+}
+
+func TestURLNeedsAHost(t *testing.T) {
+	for _, u := range []string{"http://", "https://", "https:///path", "http://:8080/x", "https://?q=1"} {
+		c := &Component{ID: "x", UpdatedAt: t0, Links: []Link{{Title: "t", URL: u}}}
+		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "links[0].url") {
+			t.Errorf("component link %q: %v", u, err)
+		}
+		r := &Run{Type: "run", Component: "x", ID: "r1", StartedAt: t0, EndedAt: t0, Outcome: Success, Artifacts: []Link{{Title: "t", URL: u}}}
+		if err := r.Validate(); err == nil || !strings.Contains(err.Error(), "artifacts[0].url") {
+			t.Errorf("run artifact %q: %v", u, err)
+		}
+		e := &Event{Type: "event", ID: "e1", At: t0, Kind: "note", Title: "t", Links: []EventLink{{Title: "t", URL: u}}}
+		if err := e.Validate(); err == nil || !strings.Contains(err.Error(), "links[0].url") {
+			t.Errorf("event link %q: %v", u, err)
+		}
+	}
+	for _, u := range []string{"http://localhost", "https://example.com", "https://example.com:8443/a?b=c#d", "http://10.249.0.1:7600/"} {
+		c := &Component{ID: "x", UpdatedAt: t0, Links: []Link{{Title: "t", URL: u}}}
+		e := &Event{Type: "event", ID: "e1", At: t0, Kind: "note", Title: "t", Links: []EventLink{{Title: "t", URL: u}}}
+		if err := errors.Join(c.Validate(), e.Validate()); err != nil {
+			t.Errorf("%q refused: %v", u, err)
+		}
+	}
+	// 500 code points is the limit, not 500 bytes.
+	u := "https://example.com/" + strings.Repeat("é", 480)
+	c := &Component{ID: "x", UpdatedAt: t0, Links: []Link{{Title: "t", URL: u}}}
+	if err := c.Validate(); err != nil {
+		t.Errorf("500 code points refused: %v", err)
+	}
+	c.Links[0].URL += "é"
+	if c.Validate() == nil {
+		t.Error("501 code points accepted")
+	}
+}
+
+// SPEC: an event kind is a token [a-z][a-z0-9-]{0,31}; beacon's own kinds are such tokens.
+func TestKindsAreTokens(t *testing.T) {
+	token := regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+	for k := range Kinds {
+		if !token.MatchString(string(k)) {
+			t.Errorf("kind %q isn't a token", k)
+		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -281,9 +282,13 @@ func (p *problems) links(field string, ls []Link) {
 	}
 }
 
+// url checks an http(s) URL with a host, at most 500 characters (code points, like
+// every length in SPEC).
 func (p *problems) url(at, u string) {
-	if !(strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")) || len(u) > 500 || strings.ContainsAny(u, " \t\n") {
-		p.add("%s.url: must be an http(s) URL of at most 500 characters", at)
+	parsed, err := url.Parse(u)
+	if !(strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")) || len([]rune(u)) > 500 ||
+		strings.ContainsAny(u, " \t\n") || err != nil || parsed.Hostname() == "" {
+		p.add("%s.url: must be an http(s) URL with a host, of at most 500 characters", at)
 	}
 }
 
