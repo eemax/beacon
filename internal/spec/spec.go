@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -285,11 +284,25 @@ func (p *problems) links(field string, ls []Link) {
 // url checks an http(s) URL with a host, at most 500 characters (code points, like
 // every length in SPEC).
 func (p *problems) url(at, u string) {
-	parsed, err := url.Parse(u)
 	if !(strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")) || len([]rune(u)) > 500 ||
-		strings.ContainsAny(u, " \t\n") || err != nil || parsed.Hostname() == "" {
+		strings.ContainsAny(u, " \t\n") || !hasHost(u) {
 		p.add("%s.url: must be an http(s) URL with a host, of at most 500 characters", at)
 	}
+}
+
+// hasHost reports whether an http(s) URL names a host: the authority after "://" (up to
+// the first / ? or #), past any userinfo@, is neither empty nor only a :port. Deliberately
+// not url.Parse: links beacon v2.5.0 accepted (an unencoded %, a bad port) stay valid.
+func hasHost(u string) bool {
+	_, rest, _ := strings.Cut(u, "://")
+	authority := rest
+	if i := strings.IndexAny(rest, "/?#"); i >= 0 {
+		authority = rest[:i]
+	}
+	if i := strings.LastIndex(authority, "@"); i >= 0 {
+		authority = authority[i+1:]
+	}
+	return authority != "" && !strings.HasPrefix(authority, ":")
 }
 
 func (p *problems) actor(a *Actor) {

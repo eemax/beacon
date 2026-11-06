@@ -163,7 +163,7 @@ func TestOldEventsStillValid(t *testing.T) {
 }
 
 func TestURLNeedsAHost(t *testing.T) {
-	for _, u := range []string{"http://", "https://", "https:///path", "http://:8080/x", "https://?q=1"} {
+	for _, u := range []string{"http://", "https://", "https:///path", "https:///p", "http://:8080/x", "https://?q=1", "https://?q", "https://#f", "https://user@/x", "https://user@:80/x"} {
 		c := &Component{ID: "x", UpdatedAt: t0, Links: []Link{{Title: "t", URL: u}}}
 		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "links[0].url") {
 			t.Errorf("component link %q: %v", u, err)
@@ -177,7 +177,10 @@ func TestURLNeedsAHost(t *testing.T) {
 			t.Errorf("event link %q: %v", u, err)
 		}
 	}
-	for _, u := range []string{"http://localhost", "https://example.com", "https://example.com:8443/a?b=c#d", "http://10.249.0.1:7600/"} {
+	// Everything beacon v2.5.0 accepted that has a host stays valid, url.Parse or not.
+	for _, u := range []string{"http://localhost", "https://example.com", "https://example.com:8443/a?b=c#d", "http://10.249.0.1:7600/",
+		"https://e.com/%zz", "https://e.com/a\rb", "https://e.com:abc/", "https://ex|ample.com/", "http://[::1]:7600/", "https://é.com/",
+		"https://user:pw@e.com/", "https://@e.com/", "https://e.com?q", "https://e.com#f"} {
 		c := &Component{ID: "x", UpdatedAt: t0, Links: []Link{{Title: "t", URL: u}}}
 		e := &Event{Type: "event", ID: "e1", At: t0, Kind: "note", Title: "t", Links: []EventLink{{Title: "t", URL: u}}}
 		if err := errors.Join(c.Validate(), e.Validate()); err != nil {
