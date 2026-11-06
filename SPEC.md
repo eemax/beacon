@@ -6,7 +6,7 @@ it: a nightly integration, a report job, a backup, the host itself) and keeps:
 - **state**: what each component is now (gauges, checks, a schedule, a run in progress), a
   snapshot that's overwritten;
 - **a log** of **runs** (every execution of a component's job) and **events** (reboots,
-  deploys, config changes, notes), append-only.
+  deploys, config changes, other changes, notes), append-only.
 
 A hub ([lookout](https://github.com/eemax/lookout)) reads both over beacon's read-only HTTP
 API: the state on every poll, the log from where it left off, so it sees every run exactly
@@ -123,16 +123,27 @@ reused) and `type`.
 ```json
 { "seq": 813, "type": "event", "id": "b7…", "at": "2026-10-22T00:00:41Z", "kind": "reboot",
   "component": null, "title": "Rebooted", "detail": "kernel 6.8.0-146 → 6.8.0-147" }
+{ "seq": 814, "type": "event", "id": "c9…", "at": "2026-10-22T09:14:03Z", "kind": "deploy",
+  "component": "centric-fetch", "title": "centric-fetch 4e1a2b7", "detail": "retry on 429",
+  "actor": { "kind": "agent", "name": "deploy-bot" },
+  "links": [ { "title": "Commit", "ref": { "kind": "commit", "id": "4e1a2b7" } },
+             { "title": "Changes", "url": "https://example.com/compare/3f0c9d1...4e1a2b7" } ] }
 ```
 
 | Field | Required | Meaning |
 |---|---|---|
 | `id` | yes | unique per box, at most 64 |
 | `at` | yes | |
-| `kind` | yes | `reboot`, `deploy`, `config`, `note`, `service` (a long-running service crashed, or failed) |
+| `kind` | yes | `reboot`, `deploy`, `config`, `note`, `service` (a long-running service crashed, or failed), `change` (a change to the box's setup that isn't a deploy, a config change or a service event: a key rotated, an access allowed, a rule edited) |
 | `component` | no | the component it's about, or null for the whole box |
 | `title` | yes | at most 200 |
 | `detail` | no | at most 2000 |
+| `actor` | no | who made the change: `kind` (`person` a human, `agent` an AI agent or automation acting for someone, `unit` a systemd unit or job) and `name` (at most 100). Leave it out when nobody did (a reboot, a crash) or nobody knows |
+| `links` | no | at most 10: what the event points to, each with a `title` (at most 100) and exactly one of `url` (`http(s)://`, at most 500) or `ref` (`kind`: `commit`, `alert`, `incident`, `conversation` or `other`; `id`: at most 200), for things that live elsewhere and have no URL of their own |
+
+A ref names a thing in the producer's world (a commit hash, a hub's alert or incident id, an
+agent's conversation); a hub that knows where such things live may turn it into a link, and
+shows it as text otherwise.
 
 The box keeps the log for 90 days (at most 20,000 entries).
 
@@ -202,9 +213,17 @@ can note).
 - **History**: run stats chart one point per run, compared with the median of earlier runs
   ("3× usual"); gauges chart over time.
 - **Units** decide formatting everywhere; `links` and `artifacts` become buttons.
+- **Events** go on the timeline with their actor ("deploy by agent deploy-bot"); their links
+  are clickable (a ref where the hub knows where it points, else its text). Events can be
+  filtered by kind and by actor, so "what changed in the 2 h before this broke" and "what
+  did this agent do" are one filter each.
 - **Group** headings order the components; within a box, problems first.
 
 ## Versioning
 
-`schema` changes only when a reader would break. New optional fields may appear within
-schema 2. v1 (`/v1/feeds`, feed documents) was replaced by this in beacon v2.0.0.
+`schema` changes only when a reader would break. New optional fields, and new values of an
+enumeration such as an event's `kind`, may appear within schema 2: a hub shows a kind it
+doesn't know as it is, and ignores fields it doesn't know. v1 (`/v1/feeds`, feed documents)
+was replaced by this in beacon v2.0.0.
+
+Within schema 2: events' `actor` and `links`, and the `change` kind, since beacon v2.6.0.
