@@ -1,0 +1,18 @@
+# beacon's checks, for `portal check` (~/portal/docs/spec-check-ledger.md): `fast` while working,
+# `full` before a build reports. Both run scripts/check.sh; its last line is the total `count:`
+# reads (tests passed, subtests included). Both key on the whole repo: the packages all share
+# internal/spec, so no per-area split is clear-cut.
+#
+# Every test runs in temp dirs with fakes: none needs systemd, the journal, a hub or a token, so
+# nothing is kept out but the by-hand systemd capture on ysera (CLAUDE.md). On the Mac no test
+# skips, but systemd_linux.go and host_linux.go have no test run here: `full` vets them for Linux
+# and cross-builds the release binaries; their tests run in CI on ubuntu.
+checks:
+  fast:   # gofmt, go vet, go test ./... (go's test cache on)
+    run: scripts/check.sh fast
+    toolchain: go version
+    count: 'check: (\d+) tests passed'
+  full:   # + go vet for Linux, bash -n install.sh, the release cross-builds, go test -race -count=1
+    run: scripts/check.sh full
+    toolchain: go version
+    count: 'check: (\d+) tests passed'
