@@ -1,4 +1,4 @@
-# beacon's checks, for `portal check` (~/portal/docs/spec-check-ledger.md): `fast` while working,
+# beacon's checks, for `portal check` (~/portal/docs/check.md): `fast` while working,
 # `full` before a build reports. Both run scripts/check.sh; its last line is the total `count:`
 # reads (tests passed, subtests included). Both key on the whole repo: the packages all share
 # internal/spec, so no per-area split is clear-cut.
