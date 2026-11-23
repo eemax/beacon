@@ -1,0 +1,7423 @@
+{
+ "schema": 3,
+ "envelope": {
+  "valid": [
+   {
+    "schema": 3,
+    "source": "box-1",
+    "beacon": "v3.0.0",
+    "generated_at": "2026-10-22T11:02:10Z",
+    "box": {
+     "os": "Ubuntu 24.04.5 LTS",
+     "kernel": "6.8.0-147-generic",
+     "arch": "amd64",
+     "boot_at": "2026-10-22T00:00:30Z"
+    },
+    "log": {
+     "first_seq": 1,
+     "last_seq": 813
+    },
+    "components": [
+     {
+      "id": "host",
+      "class": "service",
+      "title": "Host",
+      "group": "System",
+      "updated_at": "2026-10-22T11:02:00Z",
+      "expect_every": "10m",
+      "status": "ok",
+      "summary": "load 0.4, 38 % memory, 61 % disk",
+      "gauges": [
+       {
+        "key": "load.1m",
+        "label": "Load",
+        "value": 0.42
+       },
+       {
+        "key": "disk.used",
+        "label": "Disk used",
+        "value": 61.2,
+        "unit": "percent",
+        "primary": true
+       }
+      ],
+      "checks": [
+       {
+        "name": "disk",
+        "status": "ok"
+       },
+       {
+        "name": "memory",
+        "status": "ok"
+       },
+       {
+        "name": "units",
+        "status": "ok"
+       }
+      ]
+     },
+     {
+      "id": "nightly-sync",
+      "class": "service",
+      "title": "Nightly sync",
+      "group": "Integrations",
+      "description": "Pulls yesterday's orders from the ERP into SQLite.",
+      "updated_at": "2026-10-22T11:02:00Z",
+      "expect_every": "10m",
+      "schedule": {
+       "next_at": "2026-10-23T01:00:00Z",
+       "grace": "1h",
+       "every": "daily at 01:00 UTC"
+      },
+      "status": "ok",
+      "summary": "12 endpoints, 364,972 records",
+      "gauges": [
+       {
+        "key": "records.total",
+        "label": "Records",
+        "value": 364972,
+        "unit": "count",
+        "primary": true
+       },
+       {
+        "key": "records.total",
+        "label": "Records",
+        "value": 30538,
+        "unit": "count",
+        "labels": {
+         "endpoint": "orders"
+        }
+       }
+      ],
+      "checks": [
+       {
+        "name": "healthy",
+        "status": "ok",
+        "labels": {
+         "endpoint": "orders"
+        }
+       },
+       {
+        "name": "active",
+        "status": "ok",
+        "labels": {
+         "unit": "nightly-sync.service"
+        }
+       }
+      ],
+      "links": [
+       {
+        "title": "Files",
+        "url": "https://files.example.com/sync/"
+       }
+      ],
+      "reporting": {
+       "error": "state adapter failed: exit status 1: database is locked",
+       "since": "2026-10-22T10:41:00Z",
+       "last_good_at": "2026-10-22T10:40:00Z"
+      }
+     },
+     {
+      "id": "review-queue",
+      "class": "list",
+      "title": "Review queue",
+      "group": "Work",
+      "description": "Changes waiting for a review before they ship.",
+      "updated_at": "2026-10-22T11:01:00Z",
+      "summary": "3 open, 1 waiting on the owner",
+      "gauges": [
+       {
+        "key": "items.open",
+        "label": "Open",
+        "value": 3,
+        "unit": "count",
+        "primary": true
+       }
+      ],
+      "items": [
+       {
+        "id": "change-41",
+        "title": "Raise the ERP page size to 500",
+        "since": "2026-10-20T09:12:00Z",
+        "url": "https://code.example.com/changes/41",
+        "waiting": true,
+        "detail": "Approve or decline: it doubles the sync's speed and its memory."
+       },
+       {
+        "id": "change-42",
+        "title": "Retry on HTTP 429",
+        "since": "2026-10-21T14:00:00Z",
+        "status": "ok"
+       },
+       {
+        "id": "räkning 7",
+        "title": "Invoice export misses the VAT column",
+        "status": "warn"
+       }
+      ]
+     },
+     {
+      "id": "updates",
+      "class": "advisory",
+      "title": "Updates",
+      "group": "System",
+      "description": "Packages with a newer version available.",
+      "updated_at": "2026-10-22T11:00:00Z",
+      "expect_every": "26h",
+      "status": "warn",
+      "summary": "3 packages outdated, none with a security fix",
+      "gauges": [
+       {
+        "key": "packages.outdated",
+        "label": "Outdated",
+        "value": 3,
+        "unit": "count",
+        "primary": true
+       },
+       {
+        "key": "spend.month",
+        "label": "Spend this month",
+        "value": 4.18,
+        "unit": "usd"
+       }
+      ],
+      "checks": [
+       {
+        "name": "outdated",
+        "status": "warn",
+        "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+       },
+       {
+        "name": "security",
+        "status": "ok"
+       }
+      ]
+     }
+    ],
+    "invalid": [
+     {
+      "file": "components.d/broken.json",
+      "error": "systemd.units: required"
+     }
+    ]
+   },
+   {
+    "schema": 3,
+    "source": "box-2",
+    "beacon": "v3.0.0",
+    "generated_at": "2026-10-22T11:02:10Z",
+    "box": {},
+    "log": {
+     "first_seq": 0,
+     "last_seq": 0
+    },
+    "components": [],
+    "invalid": []
+   }
+  ],
+  "invalid": [
+   {
+    "why": "schema 2: no hub reads it",
+    "doc": {
+     "schema": 2,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "host",
+       "class": "service",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      },
+      {
+       "id": "nightly-sync",
+       "class": "service",
+       "title": "Nightly sync",
+       "group": "Integrations",
+       "description": "Pulls yesterday's orders from the ERP into SQLite.",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "schedule": {
+        "next_at": "2026-10-23T01:00:00Z",
+        "grace": "1h",
+        "every": "daily at 01:00 UTC"
+       },
+       "status": "ok",
+       "summary": "12 endpoints, 364,972 records",
+       "gauges": [
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 364972,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 30538,
+         "unit": "count",
+         "labels": {
+          "endpoint": "orders"
+         }
+        }
+       ],
+       "checks": [
+        {
+         "name": "healthy",
+         "status": "ok",
+         "labels": {
+          "endpoint": "orders"
+         }
+        },
+        {
+         "name": "active",
+         "status": "ok",
+         "labels": {
+          "unit": "nightly-sync.service"
+         }
+        }
+       ],
+       "links": [
+        {
+         "title": "Files",
+         "url": "https://files.example.com/sync/"
+        }
+       ],
+       "reporting": {
+        "error": "state adapter failed: exit status 1: database is locked",
+        "since": "2026-10-22T10:41:00Z",
+        "last_good_at": "2026-10-22T10:40:00Z"
+       }
+      },
+      {
+       "id": "review-queue",
+       "class": "list",
+       "title": "Review queue",
+       "group": "Work",
+       "description": "Changes waiting for a review before they ship.",
+       "updated_at": "2026-10-22T11:01:00Z",
+       "summary": "3 open, 1 waiting on the owner",
+       "gauges": [
+        {
+         "key": "items.open",
+         "label": "Open",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        }
+       ],
+       "items": [
+        {
+         "id": "change-41",
+         "title": "Raise the ERP page size to 500",
+         "since": "2026-10-20T09:12:00Z",
+         "url": "https://code.example.com/changes/41",
+         "waiting": true,
+         "detail": "Approve or decline: it doubles the sync's speed and its memory."
+        },
+        {
+         "id": "change-42",
+         "title": "Retry on HTTP 429",
+         "since": "2026-10-21T14:00:00Z",
+         "status": "ok"
+        },
+        {
+         "id": "räkning 7",
+         "title": "Invoice export misses the VAT column",
+         "status": "warn"
+        }
+       ]
+      },
+      {
+       "id": "updates",
+       "class": "advisory",
+       "title": "Updates",
+       "group": "System",
+       "description": "Packages with a newer version available.",
+       "updated_at": "2026-10-22T11:00:00Z",
+       "expect_every": "26h",
+       "status": "warn",
+       "summary": "3 packages outdated, none with a security fix",
+       "gauges": [
+        {
+         "key": "packages.outdated",
+         "label": "Outdated",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "spend.month",
+         "label": "Spend this month",
+         "value": 4.18,
+         "unit": "usd"
+        }
+       ],
+       "checks": [
+        {
+         "name": "outdated",
+         "status": "warn",
+         "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+        },
+        {
+         "name": "security",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "source missing",
+    "doc": {
+     "schema": 3,
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "host",
+       "class": "service",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      },
+      {
+       "id": "nightly-sync",
+       "class": "service",
+       "title": "Nightly sync",
+       "group": "Integrations",
+       "description": "Pulls yesterday's orders from the ERP into SQLite.",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "schedule": {
+        "next_at": "2026-10-23T01:00:00Z",
+        "grace": "1h",
+        "every": "daily at 01:00 UTC"
+       },
+       "status": "ok",
+       "summary": "12 endpoints, 364,972 records",
+       "gauges": [
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 364972,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 30538,
+         "unit": "count",
+         "labels": {
+          "endpoint": "orders"
+         }
+        }
+       ],
+       "checks": [
+        {
+         "name": "healthy",
+         "status": "ok",
+         "labels": {
+          "endpoint": "orders"
+         }
+        },
+        {
+         "name": "active",
+         "status": "ok",
+         "labels": {
+          "unit": "nightly-sync.service"
+         }
+        }
+       ],
+       "links": [
+        {
+         "title": "Files",
+         "url": "https://files.example.com/sync/"
+        }
+       ],
+       "reporting": {
+        "error": "state adapter failed: exit status 1: database is locked",
+        "since": "2026-10-22T10:41:00Z",
+        "last_good_at": "2026-10-22T10:40:00Z"
+       }
+      },
+      {
+       "id": "review-queue",
+       "class": "list",
+       "title": "Review queue",
+       "group": "Work",
+       "description": "Changes waiting for a review before they ship.",
+       "updated_at": "2026-10-22T11:01:00Z",
+       "summary": "3 open, 1 waiting on the owner",
+       "gauges": [
+        {
+         "key": "items.open",
+         "label": "Open",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        }
+       ],
+       "items": [
+        {
+         "id": "change-41",
+         "title": "Raise the ERP page size to 500",
+         "since": "2026-10-20T09:12:00Z",
+         "url": "https://code.example.com/changes/41",
+         "waiting": true,
+         "detail": "Approve or decline: it doubles the sync's speed and its memory."
+        },
+        {
+         "id": "change-42",
+         "title": "Retry on HTTP 429",
+         "since": "2026-10-21T14:00:00Z",
+         "status": "ok"
+        },
+        {
+         "id": "räkning 7",
+         "title": "Invoice export misses the VAT column",
+         "status": "warn"
+        }
+       ]
+      },
+      {
+       "id": "updates",
+       "class": "advisory",
+       "title": "Updates",
+       "group": "System",
+       "description": "Packages with a newer version available.",
+       "updated_at": "2026-10-22T11:00:00Z",
+       "expect_every": "26h",
+       "status": "warn",
+       "summary": "3 packages outdated, none with a security fix",
+       "gauges": [
+        {
+         "key": "packages.outdated",
+         "label": "Outdated",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "spend.month",
+         "label": "Spend this month",
+         "value": 4.18,
+         "unit": "usd"
+        }
+       ],
+       "checks": [
+        {
+         "name": "outdated",
+         "status": "warn",
+         "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+        },
+        {
+         "name": "security",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "log missing",
+    "doc": {
+     "schema": 3,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "components": [
+      {
+       "id": "host",
+       "class": "service",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      },
+      {
+       "id": "nightly-sync",
+       "class": "service",
+       "title": "Nightly sync",
+       "group": "Integrations",
+       "description": "Pulls yesterday's orders from the ERP into SQLite.",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "schedule": {
+        "next_at": "2026-10-23T01:00:00Z",
+        "grace": "1h",
+        "every": "daily at 01:00 UTC"
+       },
+       "status": "ok",
+       "summary": "12 endpoints, 364,972 records",
+       "gauges": [
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 364972,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "records.total",
+         "label": "Records",
+         "value": 30538,
+         "unit": "count",
+         "labels": {
+          "endpoint": "orders"
+         }
+        }
+       ],
+       "checks": [
+        {
+         "name": "healthy",
+         "status": "ok",
+         "labels": {
+          "endpoint": "orders"
+         }
+        },
+        {
+         "name": "active",
+         "status": "ok",
+         "labels": {
+          "unit": "nightly-sync.service"
+         }
+        }
+       ],
+       "links": [
+        {
+         "title": "Files",
+         "url": "https://files.example.com/sync/"
+        }
+       ],
+       "reporting": {
+        "error": "state adapter failed: exit status 1: database is locked",
+        "since": "2026-10-22T10:41:00Z",
+        "last_good_at": "2026-10-22T10:40:00Z"
+       }
+      },
+      {
+       "id": "review-queue",
+       "class": "list",
+       "title": "Review queue",
+       "group": "Work",
+       "description": "Changes waiting for a review before they ship.",
+       "updated_at": "2026-10-22T11:01:00Z",
+       "summary": "3 open, 1 waiting on the owner",
+       "gauges": [
+        {
+         "key": "items.open",
+         "label": "Open",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        }
+       ],
+       "items": [
+        {
+         "id": "change-41",
+         "title": "Raise the ERP page size to 500",
+         "since": "2026-10-20T09:12:00Z",
+         "url": "https://code.example.com/changes/41",
+         "waiting": true,
+         "detail": "Approve or decline: it doubles the sync's speed and its memory."
+        },
+        {
+         "id": "change-42",
+         "title": "Retry on HTTP 429",
+         "since": "2026-10-21T14:00:00Z",
+         "status": "ok"
+        },
+        {
+         "id": "räkning 7",
+         "title": "Invoice export misses the VAT column",
+         "status": "warn"
+        }
+       ]
+      },
+      {
+       "id": "updates",
+       "class": "advisory",
+       "title": "Updates",
+       "group": "System",
+       "description": "Packages with a newer version available.",
+       "updated_at": "2026-10-22T11:00:00Z",
+       "expect_every": "26h",
+       "status": "warn",
+       "summary": "3 packages outdated, none with a security fix",
+       "gauges": [
+        {
+         "key": "packages.outdated",
+         "label": "Outdated",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        },
+        {
+         "key": "spend.month",
+         "label": "Spend this month",
+         "value": 4.18,
+         "unit": "usd"
+        }
+       ],
+       "checks": [
+        {
+         "name": "outdated",
+         "status": "warn",
+         "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+        },
+        {
+         "name": "security",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a component without class",
+    "doc": {
+     "schema": 3,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "host",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a component with a bad class",
+    "doc": {
+     "schema": 3,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "host",
+       "class": "job",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "the same component id twice",
+    "doc": {
+     "schema": 3,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "host",
+       "class": "service",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      },
+      {
+       "id": "host",
+       "class": "service",
+       "title": "Host",
+       "group": "System",
+       "updated_at": "2026-10-22T11:02:00Z",
+       "expect_every": "10m",
+       "status": "ok",
+       "summary": "load 0.4, 38 % memory, 61 % disk",
+       "gauges": [
+        {
+         "key": "load.1m",
+         "label": "Load",
+         "value": 0.42
+        },
+        {
+         "key": "disk.used",
+         "label": "Disk used",
+         "value": 61.2,
+         "unit": "percent",
+         "primary": true
+        }
+       ],
+       "checks": [
+        {
+         "name": "disk",
+         "status": "ok"
+        },
+        {
+         "name": "memory",
+         "status": "ok"
+        },
+        {
+         "name": "units",
+         "status": "ok"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a component's item with a URL without a host",
+    "doc": {
+     "schema": 3,
+     "source": "box-1",
+     "beacon": "v3.0.0",
+     "generated_at": "2026-10-22T11:02:10Z",
+     "box": {
+      "os": "Ubuntu 24.04.5 LTS",
+      "kernel": "6.8.0-147-generic",
+      "arch": "amd64",
+      "boot_at": "2026-10-22T00:00:30Z"
+     },
+     "log": {
+      "first_seq": 1,
+      "last_seq": 813
+     },
+     "components": [
+      {
+       "id": "review-queue",
+       "class": "list",
+       "title": "Review queue",
+       "group": "Work",
+       "description": "Changes waiting for a review before they ship.",
+       "updated_at": "2026-10-22T11:01:00Z",
+       "summary": "3 open, 1 waiting on the owner",
+       "gauges": [
+        {
+         "key": "items.open",
+         "label": "Open",
+         "value": 3,
+         "unit": "count",
+         "primary": true
+        }
+       ],
+       "items": [
+        {
+         "id": "a",
+         "title": "A",
+         "url": "https:///changes/41"
+        }
+       ]
+      }
+     ],
+     "invalid": [
+      {
+       "file": "components.d/broken.json",
+       "error": "systemd.units: required"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "served": {
+  "valid": [
+   {
+    "id": "nightly-sync",
+    "class": "service",
+    "title": "Nightly sync",
+    "group": "Integrations",
+    "description": "Pulls yesterday's orders from the ERP into SQLite.",
+    "updated_at": "2026-10-22T11:02:00Z",
+    "expect_every": "10m",
+    "schedule": {
+     "next_at": "2026-10-23T01:00:00Z",
+     "grace": "1h",
+     "every": "daily at 01:00 UTC"
+    },
+    "status": "ok",
+    "summary": "12 endpoints, 364,972 records",
+    "gauges": [
+     {
+      "key": "records.total",
+      "label": "Records",
+      "value": 364972,
+      "unit": "count",
+      "primary": true
+     },
+     {
+      "key": "records.total",
+      "label": "Records",
+      "value": 30538,
+      "unit": "count",
+      "labels": {
+       "endpoint": "orders"
+      }
+     }
+    ],
+    "checks": [
+     {
+      "name": "healthy",
+      "status": "ok",
+      "labels": {
+       "endpoint": "orders"
+      }
+     },
+     {
+      "name": "active",
+      "status": "ok",
+      "labels": {
+       "unit": "nightly-sync.service"
+      }
+     }
+    ],
+    "links": [
+     {
+      "title": "Files",
+      "url": "https://files.example.com/sync/"
+     }
+    ],
+    "reporting": {
+     "error": "state adapter failed: exit status 1: database is locked",
+     "since": "2026-10-22T10:41:00Z",
+     "last_good_at": "2026-10-22T10:40:00Z"
+    }
+   },
+   {
+    "id": "review-queue",
+    "class": "list",
+    "title": "Review queue",
+    "group": "Work",
+    "description": "Changes waiting for a review before they ship.",
+    "updated_at": "2026-10-22T11:01:00Z",
+    "summary": "3 open, 1 waiting on the owner",
+    "gauges": [
+     {
+      "key": "items.open",
+      "label": "Open",
+      "value": 3,
+      "unit": "count",
+      "primary": true
+     }
+    ],
+    "items": [
+     {
+      "id": "change-41",
+      "title": "Raise the ERP page size to 500",
+      "since": "2026-10-20T09:12:00Z",
+      "url": "https://code.example.com/changes/41",
+      "waiting": true,
+      "detail": "Approve or decline: it doubles the sync's speed and its memory."
+     },
+     {
+      "id": "change-42",
+      "title": "Retry on HTTP 429",
+      "since": "2026-10-21T14:00:00Z",
+      "status": "ok"
+     },
+     {
+      "id": "räkning 7",
+      "title": "Invoice export misses the VAT column",
+      "status": "warn"
+     }
+    ]
+   },
+   {
+    "id": "backup",
+    "class": "service",
+    "title": "Backup",
+    "updated_at": "2026-10-22T11:02:00Z",
+    "schedule": {
+     "next_at": "2026-10-23T03:00:00Z"
+    },
+    "reporting": {
+     "error": "state adapter printed an invalid document: gauges[0].key: \"Size\" is not a valid key",
+     "since": "2026-10-22T09:00:00Z",
+     "last_good_at": null
+    }
+   },
+   {
+    "id": "report",
+    "class": "advisory",
+    "updated_at": "2026-10-22T11:02:00Z",
+    "running": {
+     "id": "9a0b",
+     "started_at": "2026-10-22T11:00:00Z",
+     "trigger": "manual"
+    },
+    "status": "unknown"
+   },
+   {
+    "id": "inbox",
+    "class": "list",
+    "updated_at": "2026-10-22T11:02:00Z",
+    "items": [
+     {
+      "id": "item-0",
+      "title": "Item 0"
+     },
+     {
+      "id": "item-1",
+      "title": "Item 1"
+     },
+     {
+      "id": "item-2",
+      "title": "Item 2"
+     },
+     {
+      "id": "item-3",
+      "title": "Item 3"
+     },
+     {
+      "id": "item-4",
+      "title": "Item 4"
+     },
+     {
+      "id": "item-5",
+      "title": "Item 5"
+     },
+     {
+      "id": "item-6",
+      "title": "Item 6"
+     },
+     {
+      "id": "item-7",
+      "title": "Item 7"
+     },
+     {
+      "id": "item-8",
+      "title": "Item 8"
+     },
+     {
+      "id": "item-9",
+      "title": "Item 9"
+     },
+     {
+      "id": "item-10",
+      "title": "Item 10"
+     },
+     {
+      "id": "item-11",
+      "title": "Item 11"
+     },
+     {
+      "id": "item-12",
+      "title": "Item 12"
+     },
+     {
+      "id": "item-13",
+      "title": "Item 13"
+     },
+     {
+      "id": "item-14",
+      "title": "Item 14"
+     },
+     {
+      "id": "item-15",
+      "title": "Item 15"
+     },
+     {
+      "id": "item-16",
+      "title": "Item 16"
+     },
+     {
+      "id": "item-17",
+      "title": "Item 17"
+     },
+     {
+      "id": "item-18",
+      "title": "Item 18"
+     },
+     {
+      "id": "item-19",
+      "title": "Item 19"
+     },
+     {
+      "id": "item-20",
+      "title": "Item 20"
+     },
+     {
+      "id": "item-21",
+      "title": "Item 21"
+     },
+     {
+      "id": "item-22",
+      "title": "Item 22"
+     },
+     {
+      "id": "item-23",
+      "title": "Item 23"
+     },
+     {
+      "id": "item-24",
+      "title": "Item 24"
+     },
+     {
+      "id": "item-25",
+      "title": "Item 25"
+     },
+     {
+      "id": "item-26",
+      "title": "Item 26"
+     },
+     {
+      "id": "item-27",
+      "title": "Item 27"
+     },
+     {
+      "id": "item-28",
+      "title": "Item 28"
+     },
+     {
+      "id": "item-29",
+      "title": "Item 29"
+     },
+     {
+      "id": "item-30",
+      "title": "Item 30"
+     },
+     {
+      "id": "item-31",
+      "title": "Item 31"
+     },
+     {
+      "id": "item-32",
+      "title": "Item 32"
+     },
+     {
+      "id": "item-33",
+      "title": "Item 33"
+     },
+     {
+      "id": "item-34",
+      "title": "Item 34"
+     },
+     {
+      "id": "item-35",
+      "title": "Item 35"
+     },
+     {
+      "id": "item-36",
+      "title": "Item 36"
+     },
+     {
+      "id": "item-37",
+      "title": "Item 37"
+     },
+     {
+      "id": "item-38",
+      "title": "Item 38"
+     },
+     {
+      "id": "item-39",
+      "title": "Item 39"
+     },
+     {
+      "id": "item-40",
+      "title": "Item 40"
+     },
+     {
+      "id": "item-41",
+      "title": "Item 41"
+     },
+     {
+      "id": "item-42",
+      "title": "Item 42"
+     },
+     {
+      "id": "item-43",
+      "title": "Item 43"
+     },
+     {
+      "id": "item-44",
+      "title": "Item 44"
+     },
+     {
+      "id": "item-45",
+      "title": "Item 45"
+     },
+     {
+      "id": "item-46",
+      "title": "Item 46"
+     },
+     {
+      "id": "item-47",
+      "title": "Item 47"
+     },
+     {
+      "id": "item-48",
+      "title": "Item 48"
+     },
+     {
+      "id": "item-49",
+      "title": "Item 49"
+     },
+     {
+      "id": "item-50",
+      "title": "Item 50"
+     },
+     {
+      "id": "item-51",
+      "title": "Item 51"
+     },
+     {
+      "id": "item-52",
+      "title": "Item 52"
+     },
+     {
+      "id": "item-53",
+      "title": "Item 53"
+     },
+     {
+      "id": "item-54",
+      "title": "Item 54"
+     },
+     {
+      "id": "item-55",
+      "title": "Item 55"
+     },
+     {
+      "id": "item-56",
+      "title": "Item 56"
+     },
+     {
+      "id": "item-57",
+      "title": "Item 57"
+     },
+     {
+      "id": "item-58",
+      "title": "Item 58"
+     },
+     {
+      "id": "item-59",
+      "title": "Item 59"
+     },
+     {
+      "id": "item-60",
+      "title": "Item 60"
+     },
+     {
+      "id": "item-61",
+      "title": "Item 61"
+     },
+     {
+      "id": "item-62",
+      "title": "Item 62"
+     },
+     {
+      "id": "item-63",
+      "title": "Item 63"
+     },
+     {
+      "id": "item-64",
+      "title": "Item 64"
+     },
+     {
+      "id": "item-65",
+      "title": "Item 65"
+     },
+     {
+      "id": "item-66",
+      "title": "Item 66"
+     },
+     {
+      "id": "item-67",
+      "title": "Item 67"
+     },
+     {
+      "id": "item-68",
+      "title": "Item 68"
+     },
+     {
+      "id": "item-69",
+      "title": "Item 69"
+     },
+     {
+      "id": "item-70",
+      "title": "Item 70"
+     },
+     {
+      "id": "item-71",
+      "title": "Item 71"
+     },
+     {
+      "id": "item-72",
+      "title": "Item 72"
+     },
+     {
+      "id": "item-73",
+      "title": "Item 73"
+     },
+     {
+      "id": "item-74",
+      "title": "Item 74"
+     },
+     {
+      "id": "item-75",
+      "title": "Item 75"
+     },
+     {
+      "id": "item-76",
+      "title": "Item 76"
+     },
+     {
+      "id": "item-77",
+      "title": "Item 77"
+     },
+     {
+      "id": "item-78",
+      "title": "Item 78"
+     },
+     {
+      "id": "item-79",
+      "title": "Item 79"
+     },
+     {
+      "id": "item-80",
+      "title": "Item 80"
+     },
+     {
+      "id": "item-81",
+      "title": "Item 81"
+     },
+     {
+      "id": "item-82",
+      "title": "Item 82"
+     },
+     {
+      "id": "item-83",
+      "title": "Item 83"
+     },
+     {
+      "id": "item-84",
+      "title": "Item 84"
+     },
+     {
+      "id": "item-85",
+      "title": "Item 85"
+     },
+     {
+      "id": "item-86",
+      "title": "Item 86"
+     },
+     {
+      "id": "item-87",
+      "title": "Item 87"
+     },
+     {
+      "id": "item-88",
+      "title": "Item 88"
+     },
+     {
+      "id": "item-89",
+      "title": "Item 89"
+     },
+     {
+      "id": "item-90",
+      "title": "Item 90"
+     },
+     {
+      "id": "item-91",
+      "title": "Item 91"
+     },
+     {
+      "id": "item-92",
+      "title": "Item 92"
+     },
+     {
+      "id": "item-93",
+      "title": "Item 93"
+     },
+     {
+      "id": "item-94",
+      "title": "Item 94"
+     },
+     {
+      "id": "item-95",
+      "title": "Item 95"
+     },
+     {
+      "id": "item-96",
+      "title": "Item 96"
+     },
+     {
+      "id": "item-97",
+      "title": "Item 97"
+     },
+     {
+      "id": "item-98",
+      "title": "Item 98"
+     },
+     {
+      "id": "item-99",
+      "title": "Item 99"
+     },
+     {
+      "id": "item-100",
+      "title": "Item 100"
+     },
+     {
+      "id": "item-101",
+      "title": "Item 101"
+     },
+     {
+      "id": "item-102",
+      "title": "Item 102"
+     },
+     {
+      "id": "item-103",
+      "title": "Item 103"
+     },
+     {
+      "id": "item-104",
+      "title": "Item 104"
+     },
+     {
+      "id": "item-105",
+      "title": "Item 105"
+     },
+     {
+      "id": "item-106",
+      "title": "Item 106"
+     },
+     {
+      "id": "item-107",
+      "title": "Item 107"
+     },
+     {
+      "id": "item-108",
+      "title": "Item 108"
+     },
+     {
+      "id": "item-109",
+      "title": "Item 109"
+     },
+     {
+      "id": "item-110",
+      "title": "Item 110"
+     },
+     {
+      "id": "item-111",
+      "title": "Item 111"
+     },
+     {
+      "id": "item-112",
+      "title": "Item 112"
+     },
+     {
+      "id": "item-113",
+      "title": "Item 113"
+     },
+     {
+      "id": "item-114",
+      "title": "Item 114"
+     },
+     {
+      "id": "item-115",
+      "title": "Item 115"
+     },
+     {
+      "id": "item-116",
+      "title": "Item 116"
+     },
+     {
+      "id": "item-117",
+      "title": "Item 117"
+     },
+     {
+      "id": "item-118",
+      "title": "Item 118"
+     },
+     {
+      "id": "item-119",
+      "title": "Item 119"
+     },
+     {
+      "id": "item-120",
+      "title": "Item 120"
+     },
+     {
+      "id": "item-121",
+      "title": "Item 121"
+     },
+     {
+      "id": "item-122",
+      "title": "Item 122"
+     },
+     {
+      "id": "item-123",
+      "title": "Item 123"
+     },
+     {
+      "id": "item-124",
+      "title": "Item 124"
+     },
+     {
+      "id": "item-125",
+      "title": "Item 125"
+     },
+     {
+      "id": "item-126",
+      "title": "Item 126"
+     },
+     {
+      "id": "item-127",
+      "title": "Item 127"
+     },
+     {
+      "id": "item-128",
+      "title": "Item 128"
+     },
+     {
+      "id": "item-129",
+      "title": "Item 129"
+     },
+     {
+      "id": "item-130",
+      "title": "Item 130"
+     },
+     {
+      "id": "item-131",
+      "title": "Item 131"
+     },
+     {
+      "id": "item-132",
+      "title": "Item 132"
+     },
+     {
+      "id": "item-133",
+      "title": "Item 133"
+     },
+     {
+      "id": "item-134",
+      "title": "Item 134"
+     },
+     {
+      "id": "item-135",
+      "title": "Item 135"
+     },
+     {
+      "id": "item-136",
+      "title": "Item 136"
+     },
+     {
+      "id": "item-137",
+      "title": "Item 137"
+     },
+     {
+      "id": "item-138",
+      "title": "Item 138"
+     },
+     {
+      "id": "item-139",
+      "title": "Item 139"
+     },
+     {
+      "id": "item-140",
+      "title": "Item 140"
+     },
+     {
+      "id": "item-141",
+      "title": "Item 141"
+     },
+     {
+      "id": "item-142",
+      "title": "Item 142"
+     },
+     {
+      "id": "item-143",
+      "title": "Item 143"
+     },
+     {
+      "id": "item-144",
+      "title": "Item 144"
+     },
+     {
+      "id": "item-145",
+      "title": "Item 145"
+     },
+     {
+      "id": "item-146",
+      "title": "Item 146"
+     },
+     {
+      "id": "item-147",
+      "title": "Item 147"
+     },
+     {
+      "id": "item-148",
+      "title": "Item 148"
+     },
+     {
+      "id": "item-149",
+      "title": "Item 149"
+     },
+     {
+      "id": "item-150",
+      "title": "Item 150"
+     },
+     {
+      "id": "item-151",
+      "title": "Item 151"
+     },
+     {
+      "id": "item-152",
+      "title": "Item 152"
+     },
+     {
+      "id": "item-153",
+      "title": "Item 153"
+     },
+     {
+      "id": "item-154",
+      "title": "Item 154"
+     },
+     {
+      "id": "item-155",
+      "title": "Item 155"
+     },
+     {
+      "id": "item-156",
+      "title": "Item 156"
+     },
+     {
+      "id": "item-157",
+      "title": "Item 157"
+     },
+     {
+      "id": "item-158",
+      "title": "Item 158"
+     },
+     {
+      "id": "item-159",
+      "title": "Item 159"
+     },
+     {
+      "id": "item-160",
+      "title": "Item 160"
+     },
+     {
+      "id": "item-161",
+      "title": "Item 161"
+     },
+     {
+      "id": "item-162",
+      "title": "Item 162"
+     },
+     {
+      "id": "item-163",
+      "title": "Item 163"
+     },
+     {
+      "id": "item-164",
+      "title": "Item 164"
+     },
+     {
+      "id": "item-165",
+      "title": "Item 165"
+     },
+     {
+      "id": "item-166",
+      "title": "Item 166"
+     },
+     {
+      "id": "item-167",
+      "title": "Item 167"
+     },
+     {
+      "id": "item-168",
+      "title": "Item 168"
+     },
+     {
+      "id": "item-169",
+      "title": "Item 169"
+     },
+     {
+      "id": "item-170",
+      "title": "Item 170"
+     },
+     {
+      "id": "item-171",
+      "title": "Item 171"
+     },
+     {
+      "id": "item-172",
+      "title": "Item 172"
+     },
+     {
+      "id": "item-173",
+      "title": "Item 173"
+     },
+     {
+      "id": "item-174",
+      "title": "Item 174"
+     },
+     {
+      "id": "item-175",
+      "title": "Item 175"
+     },
+     {
+      "id": "item-176",
+      "title": "Item 176"
+     },
+     {
+      "id": "item-177",
+      "title": "Item 177"
+     },
+     {
+      "id": "item-178",
+      "title": "Item 178"
+     },
+     {
+      "id": "item-179",
+      "title": "Item 179"
+     },
+     {
+      "id": "item-180",
+      "title": "Item 180"
+     },
+     {
+      "id": "item-181",
+      "title": "Item 181"
+     },
+     {
+      "id": "item-182",
+      "title": "Item 182"
+     },
+     {
+      "id": "item-183",
+      "title": "Item 183"
+     },
+     {
+      "id": "item-184",
+      "title": "Item 184"
+     },
+     {
+      "id": "item-185",
+      "title": "Item 185"
+     },
+     {
+      "id": "item-186",
+      "title": "Item 186"
+     },
+     {
+      "id": "item-187",
+      "title": "Item 187"
+     },
+     {
+      "id": "item-188",
+      "title": "Item 188"
+     },
+     {
+      "id": "item-189",
+      "title": "Item 189"
+     },
+     {
+      "id": "item-190",
+      "title": "Item 190"
+     },
+     {
+      "id": "item-191",
+      "title": "Item 191"
+     },
+     {
+      "id": "item-192",
+      "title": "Item 192"
+     },
+     {
+      "id": "item-193",
+      "title": "Item 193"
+     },
+     {
+      "id": "item-194",
+      "title": "Item 194"
+     },
+     {
+      "id": "item-195",
+      "title": "Item 195"
+     },
+     {
+      "id": "item-196",
+      "title": "Item 196"
+     },
+     {
+      "id": "item-197",
+      "title": "Item 197"
+     },
+     {
+      "id": "item-198",
+      "title": "Item 198"
+     },
+     {
+      "id": "item-199",
+      "title": "Item 199"
+     }
+    ]
+   },
+   {
+    "id": "updates",
+    "class": "advisory",
+    "title": "Updates",
+    "group": "System",
+    "description": "Packages with a newer version available.",
+    "updated_at": "2026-10-22T11:00:00Z",
+    "expect_every": "26h",
+    "status": "warn",
+    "summary": "3 packages outdated, none with a security fix",
+    "gauges": [
+     {
+      "key": "packages.outdated",
+      "label": "Outdated",
+      "value": 3,
+      "unit": "count",
+      "primary": true
+     },
+     {
+      "key": "spend.month",
+      "label": "Spend this month",
+      "value": 4.18,
+      "unit": "usd"
+     }
+    ],
+    "checks": [
+     {
+      "name": "outdated",
+      "status": "warn",
+      "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+     },
+     {
+      "name": "security",
+      "status": "ok"
+     }
+    ]
+   }
+  ],
+  "invalid": [
+   {
+    "why": "class missing: beacon always serves it",
+    "doc": {
+     "id": "nightly-sync",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "state adapter failed: exit status 1: database is locked",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": "2026-10-22T10:40:00Z"
+     }
+    }
+   },
+   {
+    "why": "class not service, advisory or list",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "critical",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "state adapter failed: exit status 1: database is locked",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": "2026-10-22T10:40:00Z"
+     }
+    }
+   },
+   {
+    "why": "reporting without since",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "exit status 1",
+      "last_good_at": null
+     }
+    }
+   },
+   {
+    "why": "reporting without last_good_at (null when never good)",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "exit status 1",
+      "since": "2026-10-22T10:41:00Z"
+     }
+    }
+   },
+   {
+    "why": "reporting with an empty error",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": null
+     }
+    }
+   },
+   {
+    "why": "reporting's error over 500 code points",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": null
+     }
+    }
+   },
+   {
+    "why": "201 items, at most 200",
+    "doc": {
+     "id": "inbox",
+     "class": "list",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "items": [
+      {
+       "id": "item-0",
+       "title": "Item 0"
+      },
+      {
+       "id": "item-1",
+       "title": "Item 1"
+      },
+      {
+       "id": "item-2",
+       "title": "Item 2"
+      },
+      {
+       "id": "item-3",
+       "title": "Item 3"
+      },
+      {
+       "id": "item-4",
+       "title": "Item 4"
+      },
+      {
+       "id": "item-5",
+       "title": "Item 5"
+      },
+      {
+       "id": "item-6",
+       "title": "Item 6"
+      },
+      {
+       "id": "item-7",
+       "title": "Item 7"
+      },
+      {
+       "id": "item-8",
+       "title": "Item 8"
+      },
+      {
+       "id": "item-9",
+       "title": "Item 9"
+      },
+      {
+       "id": "item-10",
+       "title": "Item 10"
+      },
+      {
+       "id": "item-11",
+       "title": "Item 11"
+      },
+      {
+       "id": "item-12",
+       "title": "Item 12"
+      },
+      {
+       "id": "item-13",
+       "title": "Item 13"
+      },
+      {
+       "id": "item-14",
+       "title": "Item 14"
+      },
+      {
+       "id": "item-15",
+       "title": "Item 15"
+      },
+      {
+       "id": "item-16",
+       "title": "Item 16"
+      },
+      {
+       "id": "item-17",
+       "title": "Item 17"
+      },
+      {
+       "id": "item-18",
+       "title": "Item 18"
+      },
+      {
+       "id": "item-19",
+       "title": "Item 19"
+      },
+      {
+       "id": "item-20",
+       "title": "Item 20"
+      },
+      {
+       "id": "item-21",
+       "title": "Item 21"
+      },
+      {
+       "id": "item-22",
+       "title": "Item 22"
+      },
+      {
+       "id": "item-23",
+       "title": "Item 23"
+      },
+      {
+       "id": "item-24",
+       "title": "Item 24"
+      },
+      {
+       "id": "item-25",
+       "title": "Item 25"
+      },
+      {
+       "id": "item-26",
+       "title": "Item 26"
+      },
+      {
+       "id": "item-27",
+       "title": "Item 27"
+      },
+      {
+       "id": "item-28",
+       "title": "Item 28"
+      },
+      {
+       "id": "item-29",
+       "title": "Item 29"
+      },
+      {
+       "id": "item-30",
+       "title": "Item 30"
+      },
+      {
+       "id": "item-31",
+       "title": "Item 31"
+      },
+      {
+       "id": "item-32",
+       "title": "Item 32"
+      },
+      {
+       "id": "item-33",
+       "title": "Item 33"
+      },
+      {
+       "id": "item-34",
+       "title": "Item 34"
+      },
+      {
+       "id": "item-35",
+       "title": "Item 35"
+      },
+      {
+       "id": "item-36",
+       "title": "Item 36"
+      },
+      {
+       "id": "item-37",
+       "title": "Item 37"
+      },
+      {
+       "id": "item-38",
+       "title": "Item 38"
+      },
+      {
+       "id": "item-39",
+       "title": "Item 39"
+      },
+      {
+       "id": "item-40",
+       "title": "Item 40"
+      },
+      {
+       "id": "item-41",
+       "title": "Item 41"
+      },
+      {
+       "id": "item-42",
+       "title": "Item 42"
+      },
+      {
+       "id": "item-43",
+       "title": "Item 43"
+      },
+      {
+       "id": "item-44",
+       "title": "Item 44"
+      },
+      {
+       "id": "item-45",
+       "title": "Item 45"
+      },
+      {
+       "id": "item-46",
+       "title": "Item 46"
+      },
+      {
+       "id": "item-47",
+       "title": "Item 47"
+      },
+      {
+       "id": "item-48",
+       "title": "Item 48"
+      },
+      {
+       "id": "item-49",
+       "title": "Item 49"
+      },
+      {
+       "id": "item-50",
+       "title": "Item 50"
+      },
+      {
+       "id": "item-51",
+       "title": "Item 51"
+      },
+      {
+       "id": "item-52",
+       "title": "Item 52"
+      },
+      {
+       "id": "item-53",
+       "title": "Item 53"
+      },
+      {
+       "id": "item-54",
+       "title": "Item 54"
+      },
+      {
+       "id": "item-55",
+       "title": "Item 55"
+      },
+      {
+       "id": "item-56",
+       "title": "Item 56"
+      },
+      {
+       "id": "item-57",
+       "title": "Item 57"
+      },
+      {
+       "id": "item-58",
+       "title": "Item 58"
+      },
+      {
+       "id": "item-59",
+       "title": "Item 59"
+      },
+      {
+       "id": "item-60",
+       "title": "Item 60"
+      },
+      {
+       "id": "item-61",
+       "title": "Item 61"
+      },
+      {
+       "id": "item-62",
+       "title": "Item 62"
+      },
+      {
+       "id": "item-63",
+       "title": "Item 63"
+      },
+      {
+       "id": "item-64",
+       "title": "Item 64"
+      },
+      {
+       "id": "item-65",
+       "title": "Item 65"
+      },
+      {
+       "id": "item-66",
+       "title": "Item 66"
+      },
+      {
+       "id": "item-67",
+       "title": "Item 67"
+      },
+      {
+       "id": "item-68",
+       "title": "Item 68"
+      },
+      {
+       "id": "item-69",
+       "title": "Item 69"
+      },
+      {
+       "id": "item-70",
+       "title": "Item 70"
+      },
+      {
+       "id": "item-71",
+       "title": "Item 71"
+      },
+      {
+       "id": "item-72",
+       "title": "Item 72"
+      },
+      {
+       "id": "item-73",
+       "title": "Item 73"
+      },
+      {
+       "id": "item-74",
+       "title": "Item 74"
+      },
+      {
+       "id": "item-75",
+       "title": "Item 75"
+      },
+      {
+       "id": "item-76",
+       "title": "Item 76"
+      },
+      {
+       "id": "item-77",
+       "title": "Item 77"
+      },
+      {
+       "id": "item-78",
+       "title": "Item 78"
+      },
+      {
+       "id": "item-79",
+       "title": "Item 79"
+      },
+      {
+       "id": "item-80",
+       "title": "Item 80"
+      },
+      {
+       "id": "item-81",
+       "title": "Item 81"
+      },
+      {
+       "id": "item-82",
+       "title": "Item 82"
+      },
+      {
+       "id": "item-83",
+       "title": "Item 83"
+      },
+      {
+       "id": "item-84",
+       "title": "Item 84"
+      },
+      {
+       "id": "item-85",
+       "title": "Item 85"
+      },
+      {
+       "id": "item-86",
+       "title": "Item 86"
+      },
+      {
+       "id": "item-87",
+       "title": "Item 87"
+      },
+      {
+       "id": "item-88",
+       "title": "Item 88"
+      },
+      {
+       "id": "item-89",
+       "title": "Item 89"
+      },
+      {
+       "id": "item-90",
+       "title": "Item 90"
+      },
+      {
+       "id": "item-91",
+       "title": "Item 91"
+      },
+      {
+       "id": "item-92",
+       "title": "Item 92"
+      },
+      {
+       "id": "item-93",
+       "title": "Item 93"
+      },
+      {
+       "id": "item-94",
+       "title": "Item 94"
+      },
+      {
+       "id": "item-95",
+       "title": "Item 95"
+      },
+      {
+       "id": "item-96",
+       "title": "Item 96"
+      },
+      {
+       "id": "item-97",
+       "title": "Item 97"
+      },
+      {
+       "id": "item-98",
+       "title": "Item 98"
+      },
+      {
+       "id": "item-99",
+       "title": "Item 99"
+      },
+      {
+       "id": "item-100",
+       "title": "Item 100"
+      },
+      {
+       "id": "item-101",
+       "title": "Item 101"
+      },
+      {
+       "id": "item-102",
+       "title": "Item 102"
+      },
+      {
+       "id": "item-103",
+       "title": "Item 103"
+      },
+      {
+       "id": "item-104",
+       "title": "Item 104"
+      },
+      {
+       "id": "item-105",
+       "title": "Item 105"
+      },
+      {
+       "id": "item-106",
+       "title": "Item 106"
+      },
+      {
+       "id": "item-107",
+       "title": "Item 107"
+      },
+      {
+       "id": "item-108",
+       "title": "Item 108"
+      },
+      {
+       "id": "item-109",
+       "title": "Item 109"
+      },
+      {
+       "id": "item-110",
+       "title": "Item 110"
+      },
+      {
+       "id": "item-111",
+       "title": "Item 111"
+      },
+      {
+       "id": "item-112",
+       "title": "Item 112"
+      },
+      {
+       "id": "item-113",
+       "title": "Item 113"
+      },
+      {
+       "id": "item-114",
+       "title": "Item 114"
+      },
+      {
+       "id": "item-115",
+       "title": "Item 115"
+      },
+      {
+       "id": "item-116",
+       "title": "Item 116"
+      },
+      {
+       "id": "item-117",
+       "title": "Item 117"
+      },
+      {
+       "id": "item-118",
+       "title": "Item 118"
+      },
+      {
+       "id": "item-119",
+       "title": "Item 119"
+      },
+      {
+       "id": "item-120",
+       "title": "Item 120"
+      },
+      {
+       "id": "item-121",
+       "title": "Item 121"
+      },
+      {
+       "id": "item-122",
+       "title": "Item 122"
+      },
+      {
+       "id": "item-123",
+       "title": "Item 123"
+      },
+      {
+       "id": "item-124",
+       "title": "Item 124"
+      },
+      {
+       "id": "item-125",
+       "title": "Item 125"
+      },
+      {
+       "id": "item-126",
+       "title": "Item 126"
+      },
+      {
+       "id": "item-127",
+       "title": "Item 127"
+      },
+      {
+       "id": "item-128",
+       "title": "Item 128"
+      },
+      {
+       "id": "item-129",
+       "title": "Item 129"
+      },
+      {
+       "id": "item-130",
+       "title": "Item 130"
+      },
+      {
+       "id": "item-131",
+       "title": "Item 131"
+      },
+      {
+       "id": "item-132",
+       "title": "Item 132"
+      },
+      {
+       "id": "item-133",
+       "title": "Item 133"
+      },
+      {
+       "id": "item-134",
+       "title": "Item 134"
+      },
+      {
+       "id": "item-135",
+       "title": "Item 135"
+      },
+      {
+       "id": "item-136",
+       "title": "Item 136"
+      },
+      {
+       "id": "item-137",
+       "title": "Item 137"
+      },
+      {
+       "id": "item-138",
+       "title": "Item 138"
+      },
+      {
+       "id": "item-139",
+       "title": "Item 139"
+      },
+      {
+       "id": "item-140",
+       "title": "Item 140"
+      },
+      {
+       "id": "item-141",
+       "title": "Item 141"
+      },
+      {
+       "id": "item-142",
+       "title": "Item 142"
+      },
+      {
+       "id": "item-143",
+       "title": "Item 143"
+      },
+      {
+       "id": "item-144",
+       "title": "Item 144"
+      },
+      {
+       "id": "item-145",
+       "title": "Item 145"
+      },
+      {
+       "id": "item-146",
+       "title": "Item 146"
+      },
+      {
+       "id": "item-147",
+       "title": "Item 147"
+      },
+      {
+       "id": "item-148",
+       "title": "Item 148"
+      },
+      {
+       "id": "item-149",
+       "title": "Item 149"
+      },
+      {
+       "id": "item-150",
+       "title": "Item 150"
+      },
+      {
+       "id": "item-151",
+       "title": "Item 151"
+      },
+      {
+       "id": "item-152",
+       "title": "Item 152"
+      },
+      {
+       "id": "item-153",
+       "title": "Item 153"
+      },
+      {
+       "id": "item-154",
+       "title": "Item 154"
+      },
+      {
+       "id": "item-155",
+       "title": "Item 155"
+      },
+      {
+       "id": "item-156",
+       "title": "Item 156"
+      },
+      {
+       "id": "item-157",
+       "title": "Item 157"
+      },
+      {
+       "id": "item-158",
+       "title": "Item 158"
+      },
+      {
+       "id": "item-159",
+       "title": "Item 159"
+      },
+      {
+       "id": "item-160",
+       "title": "Item 160"
+      },
+      {
+       "id": "item-161",
+       "title": "Item 161"
+      },
+      {
+       "id": "item-162",
+       "title": "Item 162"
+      },
+      {
+       "id": "item-163",
+       "title": "Item 163"
+      },
+      {
+       "id": "item-164",
+       "title": "Item 164"
+      },
+      {
+       "id": "item-165",
+       "title": "Item 165"
+      },
+      {
+       "id": "item-166",
+       "title": "Item 166"
+      },
+      {
+       "id": "item-167",
+       "title": "Item 167"
+      },
+      {
+       "id": "item-168",
+       "title": "Item 168"
+      },
+      {
+       "id": "item-169",
+       "title": "Item 169"
+      },
+      {
+       "id": "item-170",
+       "title": "Item 170"
+      },
+      {
+       "id": "item-171",
+       "title": "Item 171"
+      },
+      {
+       "id": "item-172",
+       "title": "Item 172"
+      },
+      {
+       "id": "item-173",
+       "title": "Item 173"
+      },
+      {
+       "id": "item-174",
+       "title": "Item 174"
+      },
+      {
+       "id": "item-175",
+       "title": "Item 175"
+      },
+      {
+       "id": "item-176",
+       "title": "Item 176"
+      },
+      {
+       "id": "item-177",
+       "title": "Item 177"
+      },
+      {
+       "id": "item-178",
+       "title": "Item 178"
+      },
+      {
+       "id": "item-179",
+       "title": "Item 179"
+      },
+      {
+       "id": "item-180",
+       "title": "Item 180"
+      },
+      {
+       "id": "item-181",
+       "title": "Item 181"
+      },
+      {
+       "id": "item-182",
+       "title": "Item 182"
+      },
+      {
+       "id": "item-183",
+       "title": "Item 183"
+      },
+      {
+       "id": "item-184",
+       "title": "Item 184"
+      },
+      {
+       "id": "item-185",
+       "title": "Item 185"
+      },
+      {
+       "id": "item-186",
+       "title": "Item 186"
+      },
+      {
+       "id": "item-187",
+       "title": "Item 187"
+      },
+      {
+       "id": "item-188",
+       "title": "Item 188"
+      },
+      {
+       "id": "item-189",
+       "title": "Item 189"
+      },
+      {
+       "id": "item-190",
+       "title": "Item 190"
+      },
+      {
+       "id": "item-191",
+       "title": "Item 191"
+      },
+      {
+       "id": "item-192",
+       "title": "Item 192"
+      },
+      {
+       "id": "item-193",
+       "title": "Item 193"
+      },
+      {
+       "id": "item-194",
+       "title": "Item 194"
+      },
+      {
+       "id": "item-195",
+       "title": "Item 195"
+      },
+      {
+       "id": "item-196",
+       "title": "Item 196"
+      },
+      {
+       "id": "item-197",
+       "title": "Item 197"
+      },
+      {
+       "id": "item-198",
+       "title": "Item 198"
+      },
+      {
+       "id": "item-199",
+       "title": "Item 199"
+      },
+      {
+       "id": "item-200",
+       "title": "Item 200"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item id twice",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "A"
+      },
+      {
+       "id": "a",
+       "title": "B"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item status other than ok or warn",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "status": "fail"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item url without a host",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "url": "http://:8080/x"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item waiting false: leave it out",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "waiting": false
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item id with a control character",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a\u0007b",
+       "title": "A"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item id of 65 code points",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "äääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääää",
+       "title": "A"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item without a title",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item title over 200 code points",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item detail over 500 code points",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "detail": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+     ]
+    }
+   },
+   {
+    "why": "updated_at missing",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "state adapter failed: exit status 1: database is locked",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": "2026-10-22T10:40:00Z"
+     }
+    }
+   }
+  ]
+ },
+ "component": {
+  "valid": [
+   {
+    "id": "review-queue",
+    "class": "list",
+    "title": "Review queue",
+    "group": "Work",
+    "description": "Changes waiting for a review before they ship.",
+    "updated_at": "2026-10-22T11:01:00Z",
+    "summary": "3 open, 1 waiting on the owner",
+    "gauges": [
+     {
+      "key": "items.open",
+      "label": "Open",
+      "value": 3,
+      "unit": "count",
+      "primary": true
+     }
+    ],
+    "items": [
+     {
+      "id": "change-41",
+      "title": "Raise the ERP page size to 500",
+      "since": "2026-10-20T09:12:00Z",
+      "url": "https://code.example.com/changes/41",
+      "waiting": true,
+      "detail": "Approve or decline: it doubles the sync's speed and its memory."
+     },
+     {
+      "id": "change-42",
+      "title": "Retry on HTTP 429",
+      "since": "2026-10-21T14:00:00Z",
+      "status": "ok"
+     },
+     {
+      "id": "räkning 7",
+      "title": "Invoice export misses the VAT column",
+      "status": "warn"
+     }
+    ]
+   },
+   {
+    "id": "updates",
+    "title": "Updates",
+    "group": "System",
+    "description": "Packages with a newer version available.",
+    "updated_at": "2026-10-22T11:00:00Z",
+    "expect_every": "26h",
+    "status": "warn",
+    "summary": "3 packages outdated, none with a security fix",
+    "gauges": [
+     {
+      "key": "packages.outdated",
+      "label": "Outdated",
+      "value": 3,
+      "unit": "count",
+      "primary": true
+     },
+     {
+      "key": "spend.month",
+      "label": "Spend this month",
+      "value": 4.18,
+      "unit": "usd"
+     }
+    ],
+    "checks": [
+     {
+      "name": "outdated",
+      "status": "warn",
+      "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+     },
+     {
+      "name": "security",
+      "status": "ok"
+     }
+    ]
+   },
+   {
+    "status": "ok",
+    "summary": "beacon put fills in the id and the time"
+   },
+   {
+    "id": "inbox",
+    "class": "list",
+    "updated_at": "2026-10-22T11:02:00Z",
+    "items": [
+     {
+      "id": "item-0",
+      "title": "Item 0"
+     },
+     {
+      "id": "item-1",
+      "title": "Item 1"
+     },
+     {
+      "id": "item-2",
+      "title": "Item 2"
+     },
+     {
+      "id": "item-3",
+      "title": "Item 3"
+     },
+     {
+      "id": "item-4",
+      "title": "Item 4"
+     },
+     {
+      "id": "item-5",
+      "title": "Item 5"
+     },
+     {
+      "id": "item-6",
+      "title": "Item 6"
+     },
+     {
+      "id": "item-7",
+      "title": "Item 7"
+     },
+     {
+      "id": "item-8",
+      "title": "Item 8"
+     },
+     {
+      "id": "item-9",
+      "title": "Item 9"
+     },
+     {
+      "id": "item-10",
+      "title": "Item 10"
+     },
+     {
+      "id": "item-11",
+      "title": "Item 11"
+     },
+     {
+      "id": "item-12",
+      "title": "Item 12"
+     },
+     {
+      "id": "item-13",
+      "title": "Item 13"
+     },
+     {
+      "id": "item-14",
+      "title": "Item 14"
+     },
+     {
+      "id": "item-15",
+      "title": "Item 15"
+     },
+     {
+      "id": "item-16",
+      "title": "Item 16"
+     },
+     {
+      "id": "item-17",
+      "title": "Item 17"
+     },
+     {
+      "id": "item-18",
+      "title": "Item 18"
+     },
+     {
+      "id": "item-19",
+      "title": "Item 19"
+     },
+     {
+      "id": "item-20",
+      "title": "Item 20"
+     },
+     {
+      "id": "item-21",
+      "title": "Item 21"
+     },
+     {
+      "id": "item-22",
+      "title": "Item 22"
+     },
+     {
+      "id": "item-23",
+      "title": "Item 23"
+     },
+     {
+      "id": "item-24",
+      "title": "Item 24"
+     },
+     {
+      "id": "item-25",
+      "title": "Item 25"
+     },
+     {
+      "id": "item-26",
+      "title": "Item 26"
+     },
+     {
+      "id": "item-27",
+      "title": "Item 27"
+     },
+     {
+      "id": "item-28",
+      "title": "Item 28"
+     },
+     {
+      "id": "item-29",
+      "title": "Item 29"
+     },
+     {
+      "id": "item-30",
+      "title": "Item 30"
+     },
+     {
+      "id": "item-31",
+      "title": "Item 31"
+     },
+     {
+      "id": "item-32",
+      "title": "Item 32"
+     },
+     {
+      "id": "item-33",
+      "title": "Item 33"
+     },
+     {
+      "id": "item-34",
+      "title": "Item 34"
+     },
+     {
+      "id": "item-35",
+      "title": "Item 35"
+     },
+     {
+      "id": "item-36",
+      "title": "Item 36"
+     },
+     {
+      "id": "item-37",
+      "title": "Item 37"
+     },
+     {
+      "id": "item-38",
+      "title": "Item 38"
+     },
+     {
+      "id": "item-39",
+      "title": "Item 39"
+     },
+     {
+      "id": "item-40",
+      "title": "Item 40"
+     },
+     {
+      "id": "item-41",
+      "title": "Item 41"
+     },
+     {
+      "id": "item-42",
+      "title": "Item 42"
+     },
+     {
+      "id": "item-43",
+      "title": "Item 43"
+     },
+     {
+      "id": "item-44",
+      "title": "Item 44"
+     },
+     {
+      "id": "item-45",
+      "title": "Item 45"
+     },
+     {
+      "id": "item-46",
+      "title": "Item 46"
+     },
+     {
+      "id": "item-47",
+      "title": "Item 47"
+     },
+     {
+      "id": "item-48",
+      "title": "Item 48"
+     },
+     {
+      "id": "item-49",
+      "title": "Item 49"
+     },
+     {
+      "id": "item-50",
+      "title": "Item 50"
+     },
+     {
+      "id": "item-51",
+      "title": "Item 51"
+     },
+     {
+      "id": "item-52",
+      "title": "Item 52"
+     },
+     {
+      "id": "item-53",
+      "title": "Item 53"
+     },
+     {
+      "id": "item-54",
+      "title": "Item 54"
+     },
+     {
+      "id": "item-55",
+      "title": "Item 55"
+     },
+     {
+      "id": "item-56",
+      "title": "Item 56"
+     },
+     {
+      "id": "item-57",
+      "title": "Item 57"
+     },
+     {
+      "id": "item-58",
+      "title": "Item 58"
+     },
+     {
+      "id": "item-59",
+      "title": "Item 59"
+     },
+     {
+      "id": "item-60",
+      "title": "Item 60"
+     },
+     {
+      "id": "item-61",
+      "title": "Item 61"
+     },
+     {
+      "id": "item-62",
+      "title": "Item 62"
+     },
+     {
+      "id": "item-63",
+      "title": "Item 63"
+     },
+     {
+      "id": "item-64",
+      "title": "Item 64"
+     },
+     {
+      "id": "item-65",
+      "title": "Item 65"
+     },
+     {
+      "id": "item-66",
+      "title": "Item 66"
+     },
+     {
+      "id": "item-67",
+      "title": "Item 67"
+     },
+     {
+      "id": "item-68",
+      "title": "Item 68"
+     },
+     {
+      "id": "item-69",
+      "title": "Item 69"
+     },
+     {
+      "id": "item-70",
+      "title": "Item 70"
+     },
+     {
+      "id": "item-71",
+      "title": "Item 71"
+     },
+     {
+      "id": "item-72",
+      "title": "Item 72"
+     },
+     {
+      "id": "item-73",
+      "title": "Item 73"
+     },
+     {
+      "id": "item-74",
+      "title": "Item 74"
+     },
+     {
+      "id": "item-75",
+      "title": "Item 75"
+     },
+     {
+      "id": "item-76",
+      "title": "Item 76"
+     },
+     {
+      "id": "item-77",
+      "title": "Item 77"
+     },
+     {
+      "id": "item-78",
+      "title": "Item 78"
+     },
+     {
+      "id": "item-79",
+      "title": "Item 79"
+     },
+     {
+      "id": "item-80",
+      "title": "Item 80"
+     },
+     {
+      "id": "item-81",
+      "title": "Item 81"
+     },
+     {
+      "id": "item-82",
+      "title": "Item 82"
+     },
+     {
+      "id": "item-83",
+      "title": "Item 83"
+     },
+     {
+      "id": "item-84",
+      "title": "Item 84"
+     },
+     {
+      "id": "item-85",
+      "title": "Item 85"
+     },
+     {
+      "id": "item-86",
+      "title": "Item 86"
+     },
+     {
+      "id": "item-87",
+      "title": "Item 87"
+     },
+     {
+      "id": "item-88",
+      "title": "Item 88"
+     },
+     {
+      "id": "item-89",
+      "title": "Item 89"
+     },
+     {
+      "id": "item-90",
+      "title": "Item 90"
+     },
+     {
+      "id": "item-91",
+      "title": "Item 91"
+     },
+     {
+      "id": "item-92",
+      "title": "Item 92"
+     },
+     {
+      "id": "item-93",
+      "title": "Item 93"
+     },
+     {
+      "id": "item-94",
+      "title": "Item 94"
+     },
+     {
+      "id": "item-95",
+      "title": "Item 95"
+     },
+     {
+      "id": "item-96",
+      "title": "Item 96"
+     },
+     {
+      "id": "item-97",
+      "title": "Item 97"
+     },
+     {
+      "id": "item-98",
+      "title": "Item 98"
+     },
+     {
+      "id": "item-99",
+      "title": "Item 99"
+     },
+     {
+      "id": "item-100",
+      "title": "Item 100"
+     },
+     {
+      "id": "item-101",
+      "title": "Item 101"
+     },
+     {
+      "id": "item-102",
+      "title": "Item 102"
+     },
+     {
+      "id": "item-103",
+      "title": "Item 103"
+     },
+     {
+      "id": "item-104",
+      "title": "Item 104"
+     },
+     {
+      "id": "item-105",
+      "title": "Item 105"
+     },
+     {
+      "id": "item-106",
+      "title": "Item 106"
+     },
+     {
+      "id": "item-107",
+      "title": "Item 107"
+     },
+     {
+      "id": "item-108",
+      "title": "Item 108"
+     },
+     {
+      "id": "item-109",
+      "title": "Item 109"
+     },
+     {
+      "id": "item-110",
+      "title": "Item 110"
+     },
+     {
+      "id": "item-111",
+      "title": "Item 111"
+     },
+     {
+      "id": "item-112",
+      "title": "Item 112"
+     },
+     {
+      "id": "item-113",
+      "title": "Item 113"
+     },
+     {
+      "id": "item-114",
+      "title": "Item 114"
+     },
+     {
+      "id": "item-115",
+      "title": "Item 115"
+     },
+     {
+      "id": "item-116",
+      "title": "Item 116"
+     },
+     {
+      "id": "item-117",
+      "title": "Item 117"
+     },
+     {
+      "id": "item-118",
+      "title": "Item 118"
+     },
+     {
+      "id": "item-119",
+      "title": "Item 119"
+     },
+     {
+      "id": "item-120",
+      "title": "Item 120"
+     },
+     {
+      "id": "item-121",
+      "title": "Item 121"
+     },
+     {
+      "id": "item-122",
+      "title": "Item 122"
+     },
+     {
+      "id": "item-123",
+      "title": "Item 123"
+     },
+     {
+      "id": "item-124",
+      "title": "Item 124"
+     },
+     {
+      "id": "item-125",
+      "title": "Item 125"
+     },
+     {
+      "id": "item-126",
+      "title": "Item 126"
+     },
+     {
+      "id": "item-127",
+      "title": "Item 127"
+     },
+     {
+      "id": "item-128",
+      "title": "Item 128"
+     },
+     {
+      "id": "item-129",
+      "title": "Item 129"
+     },
+     {
+      "id": "item-130",
+      "title": "Item 130"
+     },
+     {
+      "id": "item-131",
+      "title": "Item 131"
+     },
+     {
+      "id": "item-132",
+      "title": "Item 132"
+     },
+     {
+      "id": "item-133",
+      "title": "Item 133"
+     },
+     {
+      "id": "item-134",
+      "title": "Item 134"
+     },
+     {
+      "id": "item-135",
+      "title": "Item 135"
+     },
+     {
+      "id": "item-136",
+      "title": "Item 136"
+     },
+     {
+      "id": "item-137",
+      "title": "Item 137"
+     },
+     {
+      "id": "item-138",
+      "title": "Item 138"
+     },
+     {
+      "id": "item-139",
+      "title": "Item 139"
+     },
+     {
+      "id": "item-140",
+      "title": "Item 140"
+     },
+     {
+      "id": "item-141",
+      "title": "Item 141"
+     },
+     {
+      "id": "item-142",
+      "title": "Item 142"
+     },
+     {
+      "id": "item-143",
+      "title": "Item 143"
+     },
+     {
+      "id": "item-144",
+      "title": "Item 144"
+     },
+     {
+      "id": "item-145",
+      "title": "Item 145"
+     },
+     {
+      "id": "item-146",
+      "title": "Item 146"
+     },
+     {
+      "id": "item-147",
+      "title": "Item 147"
+     },
+     {
+      "id": "item-148",
+      "title": "Item 148"
+     },
+     {
+      "id": "item-149",
+      "title": "Item 149"
+     },
+     {
+      "id": "item-150",
+      "title": "Item 150"
+     },
+     {
+      "id": "item-151",
+      "title": "Item 151"
+     },
+     {
+      "id": "item-152",
+      "title": "Item 152"
+     },
+     {
+      "id": "item-153",
+      "title": "Item 153"
+     },
+     {
+      "id": "item-154",
+      "title": "Item 154"
+     },
+     {
+      "id": "item-155",
+      "title": "Item 155"
+     },
+     {
+      "id": "item-156",
+      "title": "Item 156"
+     },
+     {
+      "id": "item-157",
+      "title": "Item 157"
+     },
+     {
+      "id": "item-158",
+      "title": "Item 158"
+     },
+     {
+      "id": "item-159",
+      "title": "Item 159"
+     },
+     {
+      "id": "item-160",
+      "title": "Item 160"
+     },
+     {
+      "id": "item-161",
+      "title": "Item 161"
+     },
+     {
+      "id": "item-162",
+      "title": "Item 162"
+     },
+     {
+      "id": "item-163",
+      "title": "Item 163"
+     },
+     {
+      "id": "item-164",
+      "title": "Item 164"
+     },
+     {
+      "id": "item-165",
+      "title": "Item 165"
+     },
+     {
+      "id": "item-166",
+      "title": "Item 166"
+     },
+     {
+      "id": "item-167",
+      "title": "Item 167"
+     },
+     {
+      "id": "item-168",
+      "title": "Item 168"
+     },
+     {
+      "id": "item-169",
+      "title": "Item 169"
+     },
+     {
+      "id": "item-170",
+      "title": "Item 170"
+     },
+     {
+      "id": "item-171",
+      "title": "Item 171"
+     },
+     {
+      "id": "item-172",
+      "title": "Item 172"
+     },
+     {
+      "id": "item-173",
+      "title": "Item 173"
+     },
+     {
+      "id": "item-174",
+      "title": "Item 174"
+     },
+     {
+      "id": "item-175",
+      "title": "Item 175"
+     },
+     {
+      "id": "item-176",
+      "title": "Item 176"
+     },
+     {
+      "id": "item-177",
+      "title": "Item 177"
+     },
+     {
+      "id": "item-178",
+      "title": "Item 178"
+     },
+     {
+      "id": "item-179",
+      "title": "Item 179"
+     },
+     {
+      "id": "item-180",
+      "title": "Item 180"
+     },
+     {
+      "id": "item-181",
+      "title": "Item 181"
+     },
+     {
+      "id": "item-182",
+      "title": "Item 182"
+     },
+     {
+      "id": "item-183",
+      "title": "Item 183"
+     },
+     {
+      "id": "item-184",
+      "title": "Item 184"
+     },
+     {
+      "id": "item-185",
+      "title": "Item 185"
+     },
+     {
+      "id": "item-186",
+      "title": "Item 186"
+     },
+     {
+      "id": "item-187",
+      "title": "Item 187"
+     },
+     {
+      "id": "item-188",
+      "title": "Item 188"
+     },
+     {
+      "id": "item-189",
+      "title": "Item 189"
+     },
+     {
+      "id": "item-190",
+      "title": "Item 190"
+     },
+     {
+      "id": "item-191",
+      "title": "Item 191"
+     },
+     {
+      "id": "item-192",
+      "title": "Item 192"
+     },
+     {
+      "id": "item-193",
+      "title": "Item 193"
+     },
+     {
+      "id": "item-194",
+      "title": "Item 194"
+     },
+     {
+      "id": "item-195",
+      "title": "Item 195"
+     },
+     {
+      "id": "item-196",
+      "title": "Item 196"
+     },
+     {
+      "id": "item-197",
+      "title": "Item 197"
+     },
+     {
+      "id": "item-198",
+      "title": "Item 198"
+     },
+     {
+      "id": "item-199",
+      "title": "Item 199"
+     }
+    ]
+   }
+  ],
+  "invalid": [
+   {
+    "why": "reporting is beacon's alone (the same document is valid served)",
+    "doc": {
+     "id": "nightly-sync",
+     "class": "service",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "updated_at": "2026-10-22T11:02:00Z",
+     "expect_every": "10m",
+     "schedule": {
+      "next_at": "2026-10-23T01:00:00Z",
+      "grace": "1h",
+      "every": "daily at 01:00 UTC"
+     },
+     "status": "ok",
+     "summary": "12 endpoints, 364,972 records",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 30538,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "checks": [
+      {
+       "name": "healthy",
+       "status": "ok",
+       "labels": {
+        "endpoint": "orders"
+       }
+      },
+      {
+       "name": "active",
+       "status": "ok",
+       "labels": {
+        "unit": "nightly-sync.service"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "reporting": {
+      "error": "state adapter failed: exit status 1: database is locked",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": "2026-10-22T10:40:00Z"
+     }
+    }
+   },
+   {
+    "why": "an unknown field",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "change-41",
+       "title": "Raise the ERP page size to 500",
+       "since": "2026-10-20T09:12:00Z",
+       "url": "https://code.example.com/changes/41",
+       "waiting": true,
+       "detail": "Approve or decline: it doubles the sync's speed and its memory."
+      },
+      {
+       "id": "change-42",
+       "title": "Retry on HTTP 429",
+       "since": "2026-10-21T14:00:00Z",
+       "status": "ok"
+      },
+      {
+       "id": "räkning 7",
+       "title": "Invoice export misses the VAT column",
+       "status": "warn"
+      }
+     ],
+     "colour": "red"
+    }
+   },
+   {
+    "why": "class not service, advisory or list",
+    "doc": {
+     "id": "review-queue",
+     "class": "todo",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "change-41",
+       "title": "Raise the ERP page size to 500",
+       "since": "2026-10-20T09:12:00Z",
+       "url": "https://code.example.com/changes/41",
+       "waiting": true,
+       "detail": "Approve or decline: it doubles the sync's speed and its memory."
+      },
+      {
+       "id": "change-42",
+       "title": "Retry on HTTP 429",
+       "since": "2026-10-21T14:00:00Z",
+       "status": "ok"
+      },
+      {
+       "id": "räkning 7",
+       "title": "Invoice export misses the VAT column",
+       "status": "warn"
+      }
+     ]
+    }
+   },
+   {
+    "why": "201 items, at most 200",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "item-0",
+       "title": "Item 0"
+      },
+      {
+       "id": "item-1",
+       "title": "Item 1"
+      },
+      {
+       "id": "item-2",
+       "title": "Item 2"
+      },
+      {
+       "id": "item-3",
+       "title": "Item 3"
+      },
+      {
+       "id": "item-4",
+       "title": "Item 4"
+      },
+      {
+       "id": "item-5",
+       "title": "Item 5"
+      },
+      {
+       "id": "item-6",
+       "title": "Item 6"
+      },
+      {
+       "id": "item-7",
+       "title": "Item 7"
+      },
+      {
+       "id": "item-8",
+       "title": "Item 8"
+      },
+      {
+       "id": "item-9",
+       "title": "Item 9"
+      },
+      {
+       "id": "item-10",
+       "title": "Item 10"
+      },
+      {
+       "id": "item-11",
+       "title": "Item 11"
+      },
+      {
+       "id": "item-12",
+       "title": "Item 12"
+      },
+      {
+       "id": "item-13",
+       "title": "Item 13"
+      },
+      {
+       "id": "item-14",
+       "title": "Item 14"
+      },
+      {
+       "id": "item-15",
+       "title": "Item 15"
+      },
+      {
+       "id": "item-16",
+       "title": "Item 16"
+      },
+      {
+       "id": "item-17",
+       "title": "Item 17"
+      },
+      {
+       "id": "item-18",
+       "title": "Item 18"
+      },
+      {
+       "id": "item-19",
+       "title": "Item 19"
+      },
+      {
+       "id": "item-20",
+       "title": "Item 20"
+      },
+      {
+       "id": "item-21",
+       "title": "Item 21"
+      },
+      {
+       "id": "item-22",
+       "title": "Item 22"
+      },
+      {
+       "id": "item-23",
+       "title": "Item 23"
+      },
+      {
+       "id": "item-24",
+       "title": "Item 24"
+      },
+      {
+       "id": "item-25",
+       "title": "Item 25"
+      },
+      {
+       "id": "item-26",
+       "title": "Item 26"
+      },
+      {
+       "id": "item-27",
+       "title": "Item 27"
+      },
+      {
+       "id": "item-28",
+       "title": "Item 28"
+      },
+      {
+       "id": "item-29",
+       "title": "Item 29"
+      },
+      {
+       "id": "item-30",
+       "title": "Item 30"
+      },
+      {
+       "id": "item-31",
+       "title": "Item 31"
+      },
+      {
+       "id": "item-32",
+       "title": "Item 32"
+      },
+      {
+       "id": "item-33",
+       "title": "Item 33"
+      },
+      {
+       "id": "item-34",
+       "title": "Item 34"
+      },
+      {
+       "id": "item-35",
+       "title": "Item 35"
+      },
+      {
+       "id": "item-36",
+       "title": "Item 36"
+      },
+      {
+       "id": "item-37",
+       "title": "Item 37"
+      },
+      {
+       "id": "item-38",
+       "title": "Item 38"
+      },
+      {
+       "id": "item-39",
+       "title": "Item 39"
+      },
+      {
+       "id": "item-40",
+       "title": "Item 40"
+      },
+      {
+       "id": "item-41",
+       "title": "Item 41"
+      },
+      {
+       "id": "item-42",
+       "title": "Item 42"
+      },
+      {
+       "id": "item-43",
+       "title": "Item 43"
+      },
+      {
+       "id": "item-44",
+       "title": "Item 44"
+      },
+      {
+       "id": "item-45",
+       "title": "Item 45"
+      },
+      {
+       "id": "item-46",
+       "title": "Item 46"
+      },
+      {
+       "id": "item-47",
+       "title": "Item 47"
+      },
+      {
+       "id": "item-48",
+       "title": "Item 48"
+      },
+      {
+       "id": "item-49",
+       "title": "Item 49"
+      },
+      {
+       "id": "item-50",
+       "title": "Item 50"
+      },
+      {
+       "id": "item-51",
+       "title": "Item 51"
+      },
+      {
+       "id": "item-52",
+       "title": "Item 52"
+      },
+      {
+       "id": "item-53",
+       "title": "Item 53"
+      },
+      {
+       "id": "item-54",
+       "title": "Item 54"
+      },
+      {
+       "id": "item-55",
+       "title": "Item 55"
+      },
+      {
+       "id": "item-56",
+       "title": "Item 56"
+      },
+      {
+       "id": "item-57",
+       "title": "Item 57"
+      },
+      {
+       "id": "item-58",
+       "title": "Item 58"
+      },
+      {
+       "id": "item-59",
+       "title": "Item 59"
+      },
+      {
+       "id": "item-60",
+       "title": "Item 60"
+      },
+      {
+       "id": "item-61",
+       "title": "Item 61"
+      },
+      {
+       "id": "item-62",
+       "title": "Item 62"
+      },
+      {
+       "id": "item-63",
+       "title": "Item 63"
+      },
+      {
+       "id": "item-64",
+       "title": "Item 64"
+      },
+      {
+       "id": "item-65",
+       "title": "Item 65"
+      },
+      {
+       "id": "item-66",
+       "title": "Item 66"
+      },
+      {
+       "id": "item-67",
+       "title": "Item 67"
+      },
+      {
+       "id": "item-68",
+       "title": "Item 68"
+      },
+      {
+       "id": "item-69",
+       "title": "Item 69"
+      },
+      {
+       "id": "item-70",
+       "title": "Item 70"
+      },
+      {
+       "id": "item-71",
+       "title": "Item 71"
+      },
+      {
+       "id": "item-72",
+       "title": "Item 72"
+      },
+      {
+       "id": "item-73",
+       "title": "Item 73"
+      },
+      {
+       "id": "item-74",
+       "title": "Item 74"
+      },
+      {
+       "id": "item-75",
+       "title": "Item 75"
+      },
+      {
+       "id": "item-76",
+       "title": "Item 76"
+      },
+      {
+       "id": "item-77",
+       "title": "Item 77"
+      },
+      {
+       "id": "item-78",
+       "title": "Item 78"
+      },
+      {
+       "id": "item-79",
+       "title": "Item 79"
+      },
+      {
+       "id": "item-80",
+       "title": "Item 80"
+      },
+      {
+       "id": "item-81",
+       "title": "Item 81"
+      },
+      {
+       "id": "item-82",
+       "title": "Item 82"
+      },
+      {
+       "id": "item-83",
+       "title": "Item 83"
+      },
+      {
+       "id": "item-84",
+       "title": "Item 84"
+      },
+      {
+       "id": "item-85",
+       "title": "Item 85"
+      },
+      {
+       "id": "item-86",
+       "title": "Item 86"
+      },
+      {
+       "id": "item-87",
+       "title": "Item 87"
+      },
+      {
+       "id": "item-88",
+       "title": "Item 88"
+      },
+      {
+       "id": "item-89",
+       "title": "Item 89"
+      },
+      {
+       "id": "item-90",
+       "title": "Item 90"
+      },
+      {
+       "id": "item-91",
+       "title": "Item 91"
+      },
+      {
+       "id": "item-92",
+       "title": "Item 92"
+      },
+      {
+       "id": "item-93",
+       "title": "Item 93"
+      },
+      {
+       "id": "item-94",
+       "title": "Item 94"
+      },
+      {
+       "id": "item-95",
+       "title": "Item 95"
+      },
+      {
+       "id": "item-96",
+       "title": "Item 96"
+      },
+      {
+       "id": "item-97",
+       "title": "Item 97"
+      },
+      {
+       "id": "item-98",
+       "title": "Item 98"
+      },
+      {
+       "id": "item-99",
+       "title": "Item 99"
+      },
+      {
+       "id": "item-100",
+       "title": "Item 100"
+      },
+      {
+       "id": "item-101",
+       "title": "Item 101"
+      },
+      {
+       "id": "item-102",
+       "title": "Item 102"
+      },
+      {
+       "id": "item-103",
+       "title": "Item 103"
+      },
+      {
+       "id": "item-104",
+       "title": "Item 104"
+      },
+      {
+       "id": "item-105",
+       "title": "Item 105"
+      },
+      {
+       "id": "item-106",
+       "title": "Item 106"
+      },
+      {
+       "id": "item-107",
+       "title": "Item 107"
+      },
+      {
+       "id": "item-108",
+       "title": "Item 108"
+      },
+      {
+       "id": "item-109",
+       "title": "Item 109"
+      },
+      {
+       "id": "item-110",
+       "title": "Item 110"
+      },
+      {
+       "id": "item-111",
+       "title": "Item 111"
+      },
+      {
+       "id": "item-112",
+       "title": "Item 112"
+      },
+      {
+       "id": "item-113",
+       "title": "Item 113"
+      },
+      {
+       "id": "item-114",
+       "title": "Item 114"
+      },
+      {
+       "id": "item-115",
+       "title": "Item 115"
+      },
+      {
+       "id": "item-116",
+       "title": "Item 116"
+      },
+      {
+       "id": "item-117",
+       "title": "Item 117"
+      },
+      {
+       "id": "item-118",
+       "title": "Item 118"
+      },
+      {
+       "id": "item-119",
+       "title": "Item 119"
+      },
+      {
+       "id": "item-120",
+       "title": "Item 120"
+      },
+      {
+       "id": "item-121",
+       "title": "Item 121"
+      },
+      {
+       "id": "item-122",
+       "title": "Item 122"
+      },
+      {
+       "id": "item-123",
+       "title": "Item 123"
+      },
+      {
+       "id": "item-124",
+       "title": "Item 124"
+      },
+      {
+       "id": "item-125",
+       "title": "Item 125"
+      },
+      {
+       "id": "item-126",
+       "title": "Item 126"
+      },
+      {
+       "id": "item-127",
+       "title": "Item 127"
+      },
+      {
+       "id": "item-128",
+       "title": "Item 128"
+      },
+      {
+       "id": "item-129",
+       "title": "Item 129"
+      },
+      {
+       "id": "item-130",
+       "title": "Item 130"
+      },
+      {
+       "id": "item-131",
+       "title": "Item 131"
+      },
+      {
+       "id": "item-132",
+       "title": "Item 132"
+      },
+      {
+       "id": "item-133",
+       "title": "Item 133"
+      },
+      {
+       "id": "item-134",
+       "title": "Item 134"
+      },
+      {
+       "id": "item-135",
+       "title": "Item 135"
+      },
+      {
+       "id": "item-136",
+       "title": "Item 136"
+      },
+      {
+       "id": "item-137",
+       "title": "Item 137"
+      },
+      {
+       "id": "item-138",
+       "title": "Item 138"
+      },
+      {
+       "id": "item-139",
+       "title": "Item 139"
+      },
+      {
+       "id": "item-140",
+       "title": "Item 140"
+      },
+      {
+       "id": "item-141",
+       "title": "Item 141"
+      },
+      {
+       "id": "item-142",
+       "title": "Item 142"
+      },
+      {
+       "id": "item-143",
+       "title": "Item 143"
+      },
+      {
+       "id": "item-144",
+       "title": "Item 144"
+      },
+      {
+       "id": "item-145",
+       "title": "Item 145"
+      },
+      {
+       "id": "item-146",
+       "title": "Item 146"
+      },
+      {
+       "id": "item-147",
+       "title": "Item 147"
+      },
+      {
+       "id": "item-148",
+       "title": "Item 148"
+      },
+      {
+       "id": "item-149",
+       "title": "Item 149"
+      },
+      {
+       "id": "item-150",
+       "title": "Item 150"
+      },
+      {
+       "id": "item-151",
+       "title": "Item 151"
+      },
+      {
+       "id": "item-152",
+       "title": "Item 152"
+      },
+      {
+       "id": "item-153",
+       "title": "Item 153"
+      },
+      {
+       "id": "item-154",
+       "title": "Item 154"
+      },
+      {
+       "id": "item-155",
+       "title": "Item 155"
+      },
+      {
+       "id": "item-156",
+       "title": "Item 156"
+      },
+      {
+       "id": "item-157",
+       "title": "Item 157"
+      },
+      {
+       "id": "item-158",
+       "title": "Item 158"
+      },
+      {
+       "id": "item-159",
+       "title": "Item 159"
+      },
+      {
+       "id": "item-160",
+       "title": "Item 160"
+      },
+      {
+       "id": "item-161",
+       "title": "Item 161"
+      },
+      {
+       "id": "item-162",
+       "title": "Item 162"
+      },
+      {
+       "id": "item-163",
+       "title": "Item 163"
+      },
+      {
+       "id": "item-164",
+       "title": "Item 164"
+      },
+      {
+       "id": "item-165",
+       "title": "Item 165"
+      },
+      {
+       "id": "item-166",
+       "title": "Item 166"
+      },
+      {
+       "id": "item-167",
+       "title": "Item 167"
+      },
+      {
+       "id": "item-168",
+       "title": "Item 168"
+      },
+      {
+       "id": "item-169",
+       "title": "Item 169"
+      },
+      {
+       "id": "item-170",
+       "title": "Item 170"
+      },
+      {
+       "id": "item-171",
+       "title": "Item 171"
+      },
+      {
+       "id": "item-172",
+       "title": "Item 172"
+      },
+      {
+       "id": "item-173",
+       "title": "Item 173"
+      },
+      {
+       "id": "item-174",
+       "title": "Item 174"
+      },
+      {
+       "id": "item-175",
+       "title": "Item 175"
+      },
+      {
+       "id": "item-176",
+       "title": "Item 176"
+      },
+      {
+       "id": "item-177",
+       "title": "Item 177"
+      },
+      {
+       "id": "item-178",
+       "title": "Item 178"
+      },
+      {
+       "id": "item-179",
+       "title": "Item 179"
+      },
+      {
+       "id": "item-180",
+       "title": "Item 180"
+      },
+      {
+       "id": "item-181",
+       "title": "Item 181"
+      },
+      {
+       "id": "item-182",
+       "title": "Item 182"
+      },
+      {
+       "id": "item-183",
+       "title": "Item 183"
+      },
+      {
+       "id": "item-184",
+       "title": "Item 184"
+      },
+      {
+       "id": "item-185",
+       "title": "Item 185"
+      },
+      {
+       "id": "item-186",
+       "title": "Item 186"
+      },
+      {
+       "id": "item-187",
+       "title": "Item 187"
+      },
+      {
+       "id": "item-188",
+       "title": "Item 188"
+      },
+      {
+       "id": "item-189",
+       "title": "Item 189"
+      },
+      {
+       "id": "item-190",
+       "title": "Item 190"
+      },
+      {
+       "id": "item-191",
+       "title": "Item 191"
+      },
+      {
+       "id": "item-192",
+       "title": "Item 192"
+      },
+      {
+       "id": "item-193",
+       "title": "Item 193"
+      },
+      {
+       "id": "item-194",
+       "title": "Item 194"
+      },
+      {
+       "id": "item-195",
+       "title": "Item 195"
+      },
+      {
+       "id": "item-196",
+       "title": "Item 196"
+      },
+      {
+       "id": "item-197",
+       "title": "Item 197"
+      },
+      {
+       "id": "item-198",
+       "title": "Item 198"
+      },
+      {
+       "id": "item-199",
+       "title": "Item 199"
+      },
+      {
+       "id": "item-200",
+       "title": "Item 200"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item id twice",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "x",
+       "title": "A"
+      },
+      {
+       "id": "x",
+       "title": "B"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item status other than ok or warn",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "x",
+       "title": "A",
+       "status": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item url without a host",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "x",
+       "title": "A",
+       "url": "https://"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a link url without a host",
+    "doc": {
+     "id": "updates",
+     "class": "advisory",
+     "title": "Updates",
+     "group": "System",
+     "description": "Packages with a newer version available.",
+     "updated_at": "2026-10-22T11:00:00Z",
+     "expect_every": "26h",
+     "status": "warn",
+     "summary": "3 packages outdated, none with a security fix",
+     "gauges": [
+      {
+       "key": "packages.outdated",
+       "label": "Outdated",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "spend.month",
+       "label": "Spend this month",
+       "value": 4.18,
+       "unit": "usd"
+      }
+     ],
+     "checks": [
+      {
+       "name": "outdated",
+       "status": "warn",
+       "detail": "3 packages outdated since 2026-10-15T00:00:00Z"
+      },
+      {
+       "name": "security",
+       "status": "ok"
+      }
+     ],
+     "links": [
+      {
+       "title": "Docs",
+       "url": "https:///docs"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item with an unknown field",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "description": "Changes waiting for a review before they ship.",
+     "updated_at": "2026-10-22T11:01:00Z",
+     "summary": "3 open, 1 waiting on the owner",
+     "gauges": [
+      {
+       "key": "items.open",
+       "label": "Open",
+       "value": 3,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "items": [
+      {
+       "id": "x",
+       "title": "A",
+       "owner": "someone"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "adapter": {
+  "valid": [
+   {},
+   {
+    "status": "warn",
+    "summary": "2 of 12 endpoints behind",
+    "gauges": [
+     {
+      "key": "records.total",
+      "label": "Records",
+      "value": 364972,
+      "unit": "count",
+      "primary": true
+     }
+    ],
+    "checks": [
+     {
+      "name": "fresh",
+      "status": "warn",
+      "detail": "orders: no success since 2026-10-21T23:10:00Z",
+      "labels": {
+       "endpoint": "orders"
+      }
+     }
+    ],
+    "links": [
+     {
+      "title": "Files",
+      "url": "https://files.example.com/sync/"
+     }
+    ],
+    "items": [
+     {
+      "id": "orders",
+      "title": "Orders endpoint behind",
+      "since": "2026-10-21T23:10:00Z",
+      "status": "warn"
+     },
+     {
+      "id": "approve-schema",
+      "title": "Approve the new orders schema",
+      "waiting": true,
+      "url": "https://erp.example.com/schema"
+     }
+    ]
+   },
+   {
+    "status": "fail",
+    "summary": "the ERP refused the login (HTTP 401)"
+   }
+  ],
+  "invalid": [
+   {
+    "why": "class is the definition's",
+    "doc": {
+     "status": "warn",
+     "summary": "2 of 12 endpoints behind",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "checks": [
+      {
+       "name": "fresh",
+       "status": "warn",
+       "detail": "orders: no success since 2026-10-21T23:10:00Z",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "items": [
+      {
+       "id": "orders",
+       "title": "Orders endpoint behind",
+       "since": "2026-10-21T23:10:00Z",
+       "status": "warn"
+      },
+      {
+       "id": "approve-schema",
+       "title": "Approve the new orders schema",
+       "waiting": true,
+       "url": "https://erp.example.com/schema"
+      }
+     ],
+     "class": "list"
+    }
+   },
+   {
+    "why": "reporting is beacon's",
+    "doc": {
+     "status": "warn",
+     "summary": "2 of 12 endpoints behind",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "checks": [
+      {
+       "name": "fresh",
+       "status": "warn",
+       "detail": "orders: no success since 2026-10-21T23:10:00Z",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "items": [
+      {
+       "id": "orders",
+       "title": "Orders endpoint behind",
+       "since": "2026-10-21T23:10:00Z",
+       "status": "warn"
+      },
+      {
+       "id": "approve-schema",
+       "title": "Approve the new orders schema",
+       "waiting": true,
+       "url": "https://erp.example.com/schema"
+      }
+     ],
+     "reporting": {
+      "error": "x",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": null
+     }
+    }
+   },
+   {
+    "why": "id is the definition's",
+    "doc": {
+     "status": "warn",
+     "summary": "2 of 12 endpoints behind",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "checks": [
+      {
+       "name": "fresh",
+       "status": "warn",
+       "detail": "orders: no success since 2026-10-21T23:10:00Z",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "items": [
+      {
+       "id": "orders",
+       "title": "Orders endpoint behind",
+       "since": "2026-10-21T23:10:00Z",
+       "status": "warn"
+      },
+      {
+       "id": "approve-schema",
+       "title": "Approve the new orders schema",
+       "waiting": true,
+       "url": "https://erp.example.com/schema"
+      }
+     ],
+     "id": "nightly-sync"
+    }
+   },
+   {
+    "why": "an unknown field",
+    "doc": {
+     "status": "warn",
+     "summary": "2 of 12 endpoints behind",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "checks": [
+      {
+       "name": "fresh",
+       "status": "warn",
+       "detail": "orders: no success since 2026-10-21T23:10:00Z",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "items": [
+      {
+       "id": "orders",
+       "title": "Orders endpoint behind",
+       "since": "2026-10-21T23:10:00Z",
+       "status": "warn"
+      },
+      {
+       "id": "approve-schema",
+       "title": "Approve the new orders schema",
+       "waiting": true,
+       "url": "https://erp.example.com/schema"
+      }
+     ],
+     "healthy": true
+    }
+   },
+   {
+    "why": "status not ok, warn, fail or unknown",
+    "doc": {
+     "status": "degraded",
+     "summary": "2 of 12 endpoints behind",
+     "gauges": [
+      {
+       "key": "records.total",
+       "label": "Records",
+       "value": 364972,
+       "unit": "count",
+       "primary": true
+      }
+     ],
+     "checks": [
+      {
+       "name": "fresh",
+       "status": "warn",
+       "detail": "orders: no success since 2026-10-21T23:10:00Z",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "links": [
+      {
+       "title": "Files",
+       "url": "https://files.example.com/sync/"
+      }
+     ],
+     "items": [
+      {
+       "id": "orders",
+       "title": "Orders endpoint behind",
+       "since": "2026-10-21T23:10:00Z",
+       "status": "warn"
+      },
+      {
+       "id": "approve-schema",
+       "title": "Approve the new orders schema",
+       "waiting": true,
+       "url": "https://erp.example.com/schema"
+      }
+     ]
+    }
+   },
+   {
+    "why": "201 items, at most 200",
+    "doc": {
+     "items": [
+      {
+       "id": "item-0",
+       "title": "Item 0"
+      },
+      {
+       "id": "item-1",
+       "title": "Item 1"
+      },
+      {
+       "id": "item-2",
+       "title": "Item 2"
+      },
+      {
+       "id": "item-3",
+       "title": "Item 3"
+      },
+      {
+       "id": "item-4",
+       "title": "Item 4"
+      },
+      {
+       "id": "item-5",
+       "title": "Item 5"
+      },
+      {
+       "id": "item-6",
+       "title": "Item 6"
+      },
+      {
+       "id": "item-7",
+       "title": "Item 7"
+      },
+      {
+       "id": "item-8",
+       "title": "Item 8"
+      },
+      {
+       "id": "item-9",
+       "title": "Item 9"
+      },
+      {
+       "id": "item-10",
+       "title": "Item 10"
+      },
+      {
+       "id": "item-11",
+       "title": "Item 11"
+      },
+      {
+       "id": "item-12",
+       "title": "Item 12"
+      },
+      {
+       "id": "item-13",
+       "title": "Item 13"
+      },
+      {
+       "id": "item-14",
+       "title": "Item 14"
+      },
+      {
+       "id": "item-15",
+       "title": "Item 15"
+      },
+      {
+       "id": "item-16",
+       "title": "Item 16"
+      },
+      {
+       "id": "item-17",
+       "title": "Item 17"
+      },
+      {
+       "id": "item-18",
+       "title": "Item 18"
+      },
+      {
+       "id": "item-19",
+       "title": "Item 19"
+      },
+      {
+       "id": "item-20",
+       "title": "Item 20"
+      },
+      {
+       "id": "item-21",
+       "title": "Item 21"
+      },
+      {
+       "id": "item-22",
+       "title": "Item 22"
+      },
+      {
+       "id": "item-23",
+       "title": "Item 23"
+      },
+      {
+       "id": "item-24",
+       "title": "Item 24"
+      },
+      {
+       "id": "item-25",
+       "title": "Item 25"
+      },
+      {
+       "id": "item-26",
+       "title": "Item 26"
+      },
+      {
+       "id": "item-27",
+       "title": "Item 27"
+      },
+      {
+       "id": "item-28",
+       "title": "Item 28"
+      },
+      {
+       "id": "item-29",
+       "title": "Item 29"
+      },
+      {
+       "id": "item-30",
+       "title": "Item 30"
+      },
+      {
+       "id": "item-31",
+       "title": "Item 31"
+      },
+      {
+       "id": "item-32",
+       "title": "Item 32"
+      },
+      {
+       "id": "item-33",
+       "title": "Item 33"
+      },
+      {
+       "id": "item-34",
+       "title": "Item 34"
+      },
+      {
+       "id": "item-35",
+       "title": "Item 35"
+      },
+      {
+       "id": "item-36",
+       "title": "Item 36"
+      },
+      {
+       "id": "item-37",
+       "title": "Item 37"
+      },
+      {
+       "id": "item-38",
+       "title": "Item 38"
+      },
+      {
+       "id": "item-39",
+       "title": "Item 39"
+      },
+      {
+       "id": "item-40",
+       "title": "Item 40"
+      },
+      {
+       "id": "item-41",
+       "title": "Item 41"
+      },
+      {
+       "id": "item-42",
+       "title": "Item 42"
+      },
+      {
+       "id": "item-43",
+       "title": "Item 43"
+      },
+      {
+       "id": "item-44",
+       "title": "Item 44"
+      },
+      {
+       "id": "item-45",
+       "title": "Item 45"
+      },
+      {
+       "id": "item-46",
+       "title": "Item 46"
+      },
+      {
+       "id": "item-47",
+       "title": "Item 47"
+      },
+      {
+       "id": "item-48",
+       "title": "Item 48"
+      },
+      {
+       "id": "item-49",
+       "title": "Item 49"
+      },
+      {
+       "id": "item-50",
+       "title": "Item 50"
+      },
+      {
+       "id": "item-51",
+       "title": "Item 51"
+      },
+      {
+       "id": "item-52",
+       "title": "Item 52"
+      },
+      {
+       "id": "item-53",
+       "title": "Item 53"
+      },
+      {
+       "id": "item-54",
+       "title": "Item 54"
+      },
+      {
+       "id": "item-55",
+       "title": "Item 55"
+      },
+      {
+       "id": "item-56",
+       "title": "Item 56"
+      },
+      {
+       "id": "item-57",
+       "title": "Item 57"
+      },
+      {
+       "id": "item-58",
+       "title": "Item 58"
+      },
+      {
+       "id": "item-59",
+       "title": "Item 59"
+      },
+      {
+       "id": "item-60",
+       "title": "Item 60"
+      },
+      {
+       "id": "item-61",
+       "title": "Item 61"
+      },
+      {
+       "id": "item-62",
+       "title": "Item 62"
+      },
+      {
+       "id": "item-63",
+       "title": "Item 63"
+      },
+      {
+       "id": "item-64",
+       "title": "Item 64"
+      },
+      {
+       "id": "item-65",
+       "title": "Item 65"
+      },
+      {
+       "id": "item-66",
+       "title": "Item 66"
+      },
+      {
+       "id": "item-67",
+       "title": "Item 67"
+      },
+      {
+       "id": "item-68",
+       "title": "Item 68"
+      },
+      {
+       "id": "item-69",
+       "title": "Item 69"
+      },
+      {
+       "id": "item-70",
+       "title": "Item 70"
+      },
+      {
+       "id": "item-71",
+       "title": "Item 71"
+      },
+      {
+       "id": "item-72",
+       "title": "Item 72"
+      },
+      {
+       "id": "item-73",
+       "title": "Item 73"
+      },
+      {
+       "id": "item-74",
+       "title": "Item 74"
+      },
+      {
+       "id": "item-75",
+       "title": "Item 75"
+      },
+      {
+       "id": "item-76",
+       "title": "Item 76"
+      },
+      {
+       "id": "item-77",
+       "title": "Item 77"
+      },
+      {
+       "id": "item-78",
+       "title": "Item 78"
+      },
+      {
+       "id": "item-79",
+       "title": "Item 79"
+      },
+      {
+       "id": "item-80",
+       "title": "Item 80"
+      },
+      {
+       "id": "item-81",
+       "title": "Item 81"
+      },
+      {
+       "id": "item-82",
+       "title": "Item 82"
+      },
+      {
+       "id": "item-83",
+       "title": "Item 83"
+      },
+      {
+       "id": "item-84",
+       "title": "Item 84"
+      },
+      {
+       "id": "item-85",
+       "title": "Item 85"
+      },
+      {
+       "id": "item-86",
+       "title": "Item 86"
+      },
+      {
+       "id": "item-87",
+       "title": "Item 87"
+      },
+      {
+       "id": "item-88",
+       "title": "Item 88"
+      },
+      {
+       "id": "item-89",
+       "title": "Item 89"
+      },
+      {
+       "id": "item-90",
+       "title": "Item 90"
+      },
+      {
+       "id": "item-91",
+       "title": "Item 91"
+      },
+      {
+       "id": "item-92",
+       "title": "Item 92"
+      },
+      {
+       "id": "item-93",
+       "title": "Item 93"
+      },
+      {
+       "id": "item-94",
+       "title": "Item 94"
+      },
+      {
+       "id": "item-95",
+       "title": "Item 95"
+      },
+      {
+       "id": "item-96",
+       "title": "Item 96"
+      },
+      {
+       "id": "item-97",
+       "title": "Item 97"
+      },
+      {
+       "id": "item-98",
+       "title": "Item 98"
+      },
+      {
+       "id": "item-99",
+       "title": "Item 99"
+      },
+      {
+       "id": "item-100",
+       "title": "Item 100"
+      },
+      {
+       "id": "item-101",
+       "title": "Item 101"
+      },
+      {
+       "id": "item-102",
+       "title": "Item 102"
+      },
+      {
+       "id": "item-103",
+       "title": "Item 103"
+      },
+      {
+       "id": "item-104",
+       "title": "Item 104"
+      },
+      {
+       "id": "item-105",
+       "title": "Item 105"
+      },
+      {
+       "id": "item-106",
+       "title": "Item 106"
+      },
+      {
+       "id": "item-107",
+       "title": "Item 107"
+      },
+      {
+       "id": "item-108",
+       "title": "Item 108"
+      },
+      {
+       "id": "item-109",
+       "title": "Item 109"
+      },
+      {
+       "id": "item-110",
+       "title": "Item 110"
+      },
+      {
+       "id": "item-111",
+       "title": "Item 111"
+      },
+      {
+       "id": "item-112",
+       "title": "Item 112"
+      },
+      {
+       "id": "item-113",
+       "title": "Item 113"
+      },
+      {
+       "id": "item-114",
+       "title": "Item 114"
+      },
+      {
+       "id": "item-115",
+       "title": "Item 115"
+      },
+      {
+       "id": "item-116",
+       "title": "Item 116"
+      },
+      {
+       "id": "item-117",
+       "title": "Item 117"
+      },
+      {
+       "id": "item-118",
+       "title": "Item 118"
+      },
+      {
+       "id": "item-119",
+       "title": "Item 119"
+      },
+      {
+       "id": "item-120",
+       "title": "Item 120"
+      },
+      {
+       "id": "item-121",
+       "title": "Item 121"
+      },
+      {
+       "id": "item-122",
+       "title": "Item 122"
+      },
+      {
+       "id": "item-123",
+       "title": "Item 123"
+      },
+      {
+       "id": "item-124",
+       "title": "Item 124"
+      },
+      {
+       "id": "item-125",
+       "title": "Item 125"
+      },
+      {
+       "id": "item-126",
+       "title": "Item 126"
+      },
+      {
+       "id": "item-127",
+       "title": "Item 127"
+      },
+      {
+       "id": "item-128",
+       "title": "Item 128"
+      },
+      {
+       "id": "item-129",
+       "title": "Item 129"
+      },
+      {
+       "id": "item-130",
+       "title": "Item 130"
+      },
+      {
+       "id": "item-131",
+       "title": "Item 131"
+      },
+      {
+       "id": "item-132",
+       "title": "Item 132"
+      },
+      {
+       "id": "item-133",
+       "title": "Item 133"
+      },
+      {
+       "id": "item-134",
+       "title": "Item 134"
+      },
+      {
+       "id": "item-135",
+       "title": "Item 135"
+      },
+      {
+       "id": "item-136",
+       "title": "Item 136"
+      },
+      {
+       "id": "item-137",
+       "title": "Item 137"
+      },
+      {
+       "id": "item-138",
+       "title": "Item 138"
+      },
+      {
+       "id": "item-139",
+       "title": "Item 139"
+      },
+      {
+       "id": "item-140",
+       "title": "Item 140"
+      },
+      {
+       "id": "item-141",
+       "title": "Item 141"
+      },
+      {
+       "id": "item-142",
+       "title": "Item 142"
+      },
+      {
+       "id": "item-143",
+       "title": "Item 143"
+      },
+      {
+       "id": "item-144",
+       "title": "Item 144"
+      },
+      {
+       "id": "item-145",
+       "title": "Item 145"
+      },
+      {
+       "id": "item-146",
+       "title": "Item 146"
+      },
+      {
+       "id": "item-147",
+       "title": "Item 147"
+      },
+      {
+       "id": "item-148",
+       "title": "Item 148"
+      },
+      {
+       "id": "item-149",
+       "title": "Item 149"
+      },
+      {
+       "id": "item-150",
+       "title": "Item 150"
+      },
+      {
+       "id": "item-151",
+       "title": "Item 151"
+      },
+      {
+       "id": "item-152",
+       "title": "Item 152"
+      },
+      {
+       "id": "item-153",
+       "title": "Item 153"
+      },
+      {
+       "id": "item-154",
+       "title": "Item 154"
+      },
+      {
+       "id": "item-155",
+       "title": "Item 155"
+      },
+      {
+       "id": "item-156",
+       "title": "Item 156"
+      },
+      {
+       "id": "item-157",
+       "title": "Item 157"
+      },
+      {
+       "id": "item-158",
+       "title": "Item 158"
+      },
+      {
+       "id": "item-159",
+       "title": "Item 159"
+      },
+      {
+       "id": "item-160",
+       "title": "Item 160"
+      },
+      {
+       "id": "item-161",
+       "title": "Item 161"
+      },
+      {
+       "id": "item-162",
+       "title": "Item 162"
+      },
+      {
+       "id": "item-163",
+       "title": "Item 163"
+      },
+      {
+       "id": "item-164",
+       "title": "Item 164"
+      },
+      {
+       "id": "item-165",
+       "title": "Item 165"
+      },
+      {
+       "id": "item-166",
+       "title": "Item 166"
+      },
+      {
+       "id": "item-167",
+       "title": "Item 167"
+      },
+      {
+       "id": "item-168",
+       "title": "Item 168"
+      },
+      {
+       "id": "item-169",
+       "title": "Item 169"
+      },
+      {
+       "id": "item-170",
+       "title": "Item 170"
+      },
+      {
+       "id": "item-171",
+       "title": "Item 171"
+      },
+      {
+       "id": "item-172",
+       "title": "Item 172"
+      },
+      {
+       "id": "item-173",
+       "title": "Item 173"
+      },
+      {
+       "id": "item-174",
+       "title": "Item 174"
+      },
+      {
+       "id": "item-175",
+       "title": "Item 175"
+      },
+      {
+       "id": "item-176",
+       "title": "Item 176"
+      },
+      {
+       "id": "item-177",
+       "title": "Item 177"
+      },
+      {
+       "id": "item-178",
+       "title": "Item 178"
+      },
+      {
+       "id": "item-179",
+       "title": "Item 179"
+      },
+      {
+       "id": "item-180",
+       "title": "Item 180"
+      },
+      {
+       "id": "item-181",
+       "title": "Item 181"
+      },
+      {
+       "id": "item-182",
+       "title": "Item 182"
+      },
+      {
+       "id": "item-183",
+       "title": "Item 183"
+      },
+      {
+       "id": "item-184",
+       "title": "Item 184"
+      },
+      {
+       "id": "item-185",
+       "title": "Item 185"
+      },
+      {
+       "id": "item-186",
+       "title": "Item 186"
+      },
+      {
+       "id": "item-187",
+       "title": "Item 187"
+      },
+      {
+       "id": "item-188",
+       "title": "Item 188"
+      },
+      {
+       "id": "item-189",
+       "title": "Item 189"
+      },
+      {
+       "id": "item-190",
+       "title": "Item 190"
+      },
+      {
+       "id": "item-191",
+       "title": "Item 191"
+      },
+      {
+       "id": "item-192",
+       "title": "Item 192"
+      },
+      {
+       "id": "item-193",
+       "title": "Item 193"
+      },
+      {
+       "id": "item-194",
+       "title": "Item 194"
+      },
+      {
+       "id": "item-195",
+       "title": "Item 195"
+      },
+      {
+       "id": "item-196",
+       "title": "Item 196"
+      },
+      {
+       "id": "item-197",
+       "title": "Item 197"
+      },
+      {
+       "id": "item-198",
+       "title": "Item 198"
+      },
+      {
+       "id": "item-199",
+       "title": "Item 199"
+      },
+      {
+       "id": "item-200",
+       "title": "Item 200"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item id twice",
+    "doc": {
+     "items": [
+      {
+       "id": "a",
+       "title": "A"
+      },
+      {
+       "id": "a",
+       "title": "A again"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item status other than ok or warn",
+    "doc": {
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "status": "flagged"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an item url without a host",
+    "doc": {
+     "items": [
+      {
+       "id": "a",
+       "title": "A",
+       "url": "https://@/x"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a gauge key that isn't a key",
+    "doc": {
+     "gauges": [
+      {
+       "key": "Records",
+       "value": 1
+      }
+     ]
+    }
+   },
+   {
+    "why": "the same gauge twice",
+    "doc": {
+     "gauges": [
+      {
+       "key": "size",
+       "value": 1
+      },
+      {
+       "key": "size",
+       "value": 2
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "run": {
+  "valid": [
+   {
+    "seq": 812,
+    "type": "run",
+    "component": "nightly-sync",
+    "id": "4f1c2e7a9b",
+    "started_at": "2026-10-22T01:00:02Z",
+    "ended_at": "2026-10-22T01:02:06Z",
+    "outcome": "success",
+    "trigger": "timer",
+    "exit_code": 0,
+    "unit": "nightly-sync.service",
+    "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+    "stats": [
+     {
+      "key": "records.new",
+      "label": "New records",
+      "value": 697,
+      "unit": "count",
+      "primary": true
+     },
+     {
+      "key": "records.new",
+      "label": "New",
+      "value": 17,
+      "unit": "count",
+      "labels": {
+       "endpoint": "orders"
+      }
+     }
+    ],
+    "artifacts": [
+     {
+      "title": "Report",
+      "url": "https://files.example.com/report.xlsx"
+     }
+    ]
+   },
+   {
+    "seq": 813,
+    "type": "run",
+    "component": "backup",
+    "id": "run-813",
+    "started_at": "2026-10-22T03:00:00Z",
+    "ended_at": "2026-10-22T03:00:04Z",
+    "outcome": "failure",
+    "exit_code": 1,
+    "unit": "backup",
+    "error": "error: the backup target refused the login (HTTP 401)"
+   },
+   {
+    "component": "backup",
+    "id": "manual-1",
+    "started_at": "2026-10-22T04:00:00Z",
+    "ended_at": "2026-10-22T04:00:00Z",
+    "outcome": "cancelled",
+    "trigger": "manual"
+   }
+  ],
+  "invalid": [
+   {
+    "why": "outcome not success, failure or cancelled",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "ok",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "ended_at before started_at",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T00:59:00Z",
+     "outcome": "success",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "started_at missing",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "success",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "outcome missing",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "type is not run",
+    "doc": {
+     "seq": 812,
+     "type": "event",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "success",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "trigger not a trigger",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "success",
+     "trigger": "cron",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "an artifact url without a host",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "success",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "records.new",
+       "label": "New records",
+       "value": 697,
+       "unit": "count",
+       "primary": true
+      },
+      {
+       "key": "records.new",
+       "label": "New",
+       "value": 17,
+       "unit": "count",
+       "labels": {
+        "endpoint": "orders"
+       }
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https:///report.xlsx"
+      }
+     ]
+    }
+   },
+   {
+    "why": "error over 2000 code points",
+    "doc": {
+     "seq": 813,
+     "type": "run",
+     "component": "backup",
+     "id": "run-813",
+     "started_at": "2026-10-22T03:00:00Z",
+     "ended_at": "2026-10-22T03:00:04Z",
+     "outcome": "failure",
+     "exit_code": 1,
+     "unit": "backup",
+     "error": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+   },
+   {
+    "why": "a stat twice",
+    "doc": {
+     "seq": 812,
+     "type": "run",
+     "component": "nightly-sync",
+     "id": "4f1c2e7a9b",
+     "started_at": "2026-10-22T01:00:02Z",
+     "ended_at": "2026-10-22T01:02:06Z",
+     "outcome": "success",
+     "trigger": "timer",
+     "exit_code": 0,
+     "unit": "nightly-sync.service",
+     "summary": "delta fetch: 1,851 records, 697 new, 927 changed",
+     "stats": [
+      {
+       "key": "n",
+       "value": 1
+      },
+      {
+       "key": "n",
+       "value": 2
+      }
+     ],
+     "artifacts": [
+      {
+       "title": "Report",
+       "url": "https://files.example.com/report.xlsx"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "definition": {
+  "valid": [
+   {
+    "id": "nightly-sync",
+    "title": "Nightly sync",
+    "group": "Integrations",
+    "description": "Pulls yesterday's orders from the ERP into SQLite.",
+    "systemd": {
+     "units": [
+      "nightly-sync.service"
+     ],
+     "timers": [
+      "nightly-sync.timer"
+     ]
+    },
+    "schedule": {
+     "every": "daily at 01:00",
+     "grace": "1h"
+    },
+    "run": "/usr/local/lib/beacon/nightly-sync-run",
+    "state": "/usr/local/lib/beacon/nightly-sync-state"
+   },
+   {
+    "id": "files",
+    "class": "service",
+    "title": "File store",
+    "systemd": {
+     "units": [
+      "caddy.service",
+      "dufs.service"
+     ]
+    },
+    "probes": [
+     {
+      "url": "https://files.example.com/",
+      "expect": [
+       200,
+       401
+      ]
+     },
+     {
+      "name": "ssh",
+      "tcp": "127.0.0.1:22"
+     }
+    ]
+   },
+   {
+    "id": "review-queue",
+    "class": "list",
+    "title": "Review queue",
+    "group": "Work",
+    "state": "/usr/local/lib/beacon/review-queue-state",
+    "state_every": "5m",
+    "expect_every": "15m"
+   },
+   {
+    "id": "updates",
+    "class": "advisory",
+    "state": "/usr/local/lib/beacon/updates-state",
+    "state_every": "6h",
+    "expect_every": "26h"
+   },
+   {
+    "id": "backup"
+   }
+  ],
+  "invalid": [
+   {
+    "why": "an unknown field",
+    "doc": {
+     "id": "nightly-sync",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "systemd": {
+      "units": [
+       "nightly-sync.service"
+      ],
+      "timers": [
+       "nightly-sync.timer"
+      ]
+     },
+     "schedule": {
+      "every": "daily at 01:00",
+      "grace": "1h"
+     },
+     "run": "/usr/local/lib/beacon/nightly-sync-run",
+     "state": "/usr/local/lib/beacon/nightly-sync-state",
+     "timer": "nightly-sync.timer"
+    }
+   },
+   {
+    "why": "class not service, advisory or list",
+    "doc": {
+     "id": "review-queue",
+     "class": "queue",
+     "title": "Review queue",
+     "group": "Work",
+     "state": "/usr/local/lib/beacon/review-queue-state",
+     "state_every": "5m",
+     "expect_every": "15m"
+    }
+   },
+   {
+    "why": "reporting is beacon's",
+    "doc": {
+     "id": "nightly-sync",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "systemd": {
+      "units": [
+       "nightly-sync.service"
+      ],
+      "timers": [
+       "nightly-sync.timer"
+      ]
+     },
+     "schedule": {
+      "every": "daily at 01:00",
+      "grace": "1h"
+     },
+     "run": "/usr/local/lib/beacon/nightly-sync-run",
+     "state": "/usr/local/lib/beacon/nightly-sync-state",
+     "reporting": {
+      "error": "x",
+      "since": "2026-10-22T10:41:00Z",
+      "last_good_at": null
+     }
+    }
+   },
+   {
+    "why": "id host is beacon's built-in component",
+    "doc": {
+     "id": "host"
+    }
+   },
+   {
+    "why": "id missing",
+    "doc": {
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "systemd": {
+      "units": [
+       "nightly-sync.service"
+      ],
+      "timers": [
+       "nightly-sync.timer"
+      ]
+     },
+     "schedule": {
+      "every": "daily at 01:00",
+      "grace": "1h"
+     },
+     "run": "/usr/local/lib/beacon/nightly-sync-run",
+     "state": "/usr/local/lib/beacon/nightly-sync-state"
+    }
+   },
+   {
+    "why": "systemd without units",
+    "doc": {
+     "id": "nightly-sync",
+     "title": "Nightly sync",
+     "group": "Integrations",
+     "description": "Pulls yesterday's orders from the ERP into SQLite.",
+     "systemd": {
+      "timers": [
+       "nightly-sync.timer"
+      ]
+     },
+     "schedule": {
+      "every": "daily at 01:00",
+      "grace": "1h"
+     },
+     "run": "/usr/local/lib/beacon/nightly-sync-run",
+     "state": "/usr/local/lib/beacon/nightly-sync-state"
+    }
+   },
+   {
+    "why": "state_every without a state adapter",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "state_every": "5m",
+     "expect_every": "15m"
+    }
+   },
+   {
+    "why": "a probe with both url and tcp",
+    "doc": {
+     "id": "files",
+     "class": "service",
+     "title": "File store",
+     "systemd": {
+      "units": [
+       "caddy.service",
+       "dufs.service"
+      ]
+     },
+     "probes": [
+      {
+       "url": "https://files.example.com/",
+       "tcp": "127.0.0.1:443"
+      }
+     ]
+    }
+   },
+   {
+    "why": "a probe URL with credentials",
+    "doc": {
+     "id": "files",
+     "class": "service",
+     "title": "File store",
+     "systemd": {
+      "units": [
+       "caddy.service",
+       "dufs.service"
+      ]
+     },
+     "probes": [
+      {
+       "url": "https://user:secret@files.example.com/"
+      }
+     ]
+    }
+   },
+   {
+    "why": "items belong to the state, not the definition",
+    "doc": {
+     "id": "review-queue",
+     "class": "list",
+     "title": "Review queue",
+     "group": "Work",
+     "state": "/usr/local/lib/beacon/review-queue-state",
+     "state_every": "5m",
+     "expect_every": "15m",
+     "items": [
+      {
+       "id": "a",
+       "title": "A"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}
