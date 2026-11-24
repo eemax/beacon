@@ -101,8 +101,9 @@ report): `beacon check --adapter FILE|-` checks a document an adapter printed, a
 `beacon check --definitions DIR [--only ID,...]` runs each definition's state adapter
 (checked as an adapter) and run adapter (its document merged into a made-up finished run
 and checked as a run) once, with `BEACON_COMPONENT` set and the collect timeout, and
-prints `ok <id>` or `BAD <id>: <why>` for each. It exits 1 when any is bad or an `--only`
-id has no definition, needs no systemd and writes nothing.
+prints `ok <id>` or `BAD <id>: <why>` for each. It exits 1 when any is bad, an `--only`
+id has no definition, or DIR can't be read or holds no definition (`BAD DIR: …`: a gate
+that checked nothing never passes); it needs no systemd and writes nothing.
 
 Adapters describe, the hub presents (SPEC.md → How a hub presents it): mark the headline
 numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that

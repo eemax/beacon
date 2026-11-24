@@ -528,3 +528,21 @@ func TestReportingCheckDefinitions(t *testing.T) {
 		t.Errorf("wrote %v", entries)
 	}
 }
+
+// A gate that checked nothing must not pass: a missing or unreadable dir, or one with no
+// definitions, is bad.
+func TestReportingCheckDefinitionsNothingToCheck(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "nope")
+	if lines, bad := CheckDefinitions(context.Background(), missing, nil, time.Second); bad != 1 || len(lines) != 1 || !strings.HasPrefix(lines[0], "BAD "+missing+": definitions:") {
+		t.Errorf("missing dir: %v (%d)", lines, bad)
+	}
+	if lines, bad := CheckDefinitions(context.Background(), missing, []string{"a"}, time.Second); bad != 1 || len(lines) != 1 {
+		t.Errorf("missing dir with --only: %v (%d)", lines, bad)
+	}
+	empty := t.TempDir()
+	os.WriteFile(filepath.Join(empty, "notes.txt"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(empty, ".hidden.json"), []byte(`{"id":".hidden"}`), 0o644)
+	if lines, bad := CheckDefinitions(context.Background(), empty, nil, time.Second); bad != 1 || len(lines) != 1 || lines[0] != "BAD "+empty+": no definitions" {
+		t.Errorf("empty dir: %v (%d)", lines, bad)
+	}
+}

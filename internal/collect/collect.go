@@ -847,8 +847,8 @@ func mergeRunAdapter(out []byte, run spec.Run) (spec.Run, error) {
 // adapter (checked as an adapter) and run adapter (checked as a run: its document merged
 // into a finished run of the component) once, with BEACON_COMPONENT set, and returns a
 // line per definition, "ok <id>" or "BAD <id>: <why>", and how many are bad. only limits
-// it to those ids (an id without a definition is bad). It needs no systemd and writes
-// nothing.
+// it to those ids (an id without a definition is bad). A dir it can't read, or one with
+// no definition in it, is bad too. It needs no systemd and writes nothing.
 func CheckDefinitions(ctx context.Context, dir string, only []string, timeout time.Duration) ([]string, int) {
 	var lines []string
 	bad := 0
@@ -865,7 +865,13 @@ func CheckDefinitions(ctx context.Context, dir string, only []string, timeout ti
 		want[id] = true
 	}
 	found := map[string]bool{}
-	entries, _ := os.ReadDir(dir)
+	// The deploy gate: a directory that can't be read, or holds no definition to check,
+	// is bad, never a pass that checked nothing.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		report(dir, []string{"definitions: " + oneLine(err.Error())})
+		return lines, bad
+	}
 	for _, e := range entries {
 		id, isJSON := strings.CutSuffix(e.Name(), ".json")
 		if !isJSON || !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || (len(want) > 0 && !want[id]) {
@@ -916,6 +922,9 @@ func CheckDefinitions(ctx context.Context, dir string, only []string, timeout ti
 			found[id] = true
 			report(id, []string{"no definition"})
 		}
+	}
+	if len(found) == 0 {
+		report(dir, []string{"no definitions"})
 	}
 	return lines, bad
 }
