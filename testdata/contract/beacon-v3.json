@@ -6835,6 +6835,8 @@
     "error": "error: the backup target refused the login (HTTP 401)"
    },
    {
+    "seq": 814,
+    "type": "run",
     "component": "backup",
     "id": "manual-1",
     "started_at": "2026-10-22T04:00:00Z",
