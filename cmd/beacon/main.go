@@ -417,7 +417,7 @@ func cmdPut(args []string) error {
 	fs.Var(&checks, "check", "name[{name=value,…}]=status[:detail] (repeatable)")
 	fs.Var(&primary, "primary", "mark this gauge key as a headline number (repeatable)")
 	fs.Var(&links, "link", "title=url (repeatable)")
-	fs.Var(&items, "item", "id=title[|url=…|waiting|since=RFC3339|status=ok|warn|detail=…] (repeatable; at most 200)")
+	fs.Var(&items, "item", "id=title[|url=…|waiting|since=RFC3339|status=ok/warn|detail=…] (repeatable; at most 200)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
