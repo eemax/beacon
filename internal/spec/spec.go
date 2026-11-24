@@ -1,4 +1,4 @@
-// Package spec is beacon v2's data (SPEC.md): components (state), runs and events (the
+// Package spec is beacon v3's data (SPEC.md): components (state), runs and events (the
 // log), their validation, and reading/writing component files.
 package spec
 
@@ -16,10 +16,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
-	Schema   = 2
+	Schema   = 3
 	MaxBytes = 256 << 10
 	ext      = ".json"
 )
@@ -69,21 +71,78 @@ type Running struct {
 	Trigger   string    `json:"trigger,omitempty"`
 }
 
+// Class says what a component is for, and so what a hub makes of its status: a service
+// failing needs someone today; an advisory or a list only ever suggests.
+type Class string
+
+const (
+	Service  Class = "service"
+	Advisory Class = "advisory"
+	List     Class = "list"
+)
+
+func validClass(c Class) bool { return c == Service || c == Advisory || c == List }
+
+// Item is one thing in a component's list: work, a suggestion, something waiting. Items are
+// never judged by a hub; they're shown.
+type Item struct {
+	ID      string     `json:"id"`
+	Title   string     `json:"title"`
+	Since   *time.Time `json:"since,omitempty"`
+	Status  Status     `json:"status,omitempty"` // ok or warn
+	URL     string     `json:"url,omitempty"`
+	Waiting *bool      `json:"waiting,omitempty"` // true, or left out
+	Detail  string     `json:"detail,omitempty"`
+}
+
+// MaxItems is the most items a component lists.
+const MaxItems = 200
+
+// Reporting says the component's state adapter is failing: the rest of the component is
+// the adapter's last good output, and LastGoodAt (null when it never was good) says how
+// old that is. Only beacon sets it.
+type Reporting struct {
+	Error      string     `json:"error"`
+	Since      time.Time  `json:"since"`
+	LastGoodAt *time.Time `json:"last_good_at"`
+}
+
+// UnmarshalJSON insists on all three fields (last_good_at may be null, not missing).
+func (r *Reporting) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for k := range raw {
+		if k != "error" && k != "since" && k != "last_good_at" {
+			return fmt.Errorf("reporting: unknown field %q", k)
+		}
+	}
+	if _, ok := raw["last_good_at"]; !ok {
+		return errors.New("reporting.last_good_at: required (null when it was never good)")
+	}
+	type plain Reporting
+	return json.Unmarshal(data, (*plain)(r))
+}
+
 // Component is the state of one thing on the box (SPEC.md → Component).
 type Component struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title,omitempty"`
-	Group       string    `json:"group,omitempty"`
-	Description string    `json:"description,omitempty"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	ExpectEvery string    `json:"expect_every,omitempty"`
-	Schedule    *Schedule `json:"schedule,omitempty"`
-	Running     *Running  `json:"running,omitempty"`
-	Status      Status    `json:"status,omitempty"`
-	Summary     string    `json:"summary,omitempty"`
-	Gauges      []Metric  `json:"gauges,omitempty"`
-	Checks      []Check   `json:"checks,omitempty"`
-	Links       []Link    `json:"links,omitempty"`
+	ID          string     `json:"id"`
+	Class       Class      `json:"class,omitempty"`
+	Title       string     `json:"title,omitempty"`
+	Group       string     `json:"group,omitempty"`
+	Description string     `json:"description,omitempty"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ExpectEvery string     `json:"expect_every,omitempty"`
+	Schedule    *Schedule  `json:"schedule,omitempty"`
+	Running     *Running   `json:"running,omitempty"`
+	Status      Status     `json:"status,omitempty"`
+	Summary     string     `json:"summary,omitempty"`
+	Gauges      []Metric   `json:"gauges,omitempty"`
+	Checks      []Check    `json:"checks,omitempty"`
+	Links       []Link     `json:"links,omitempty"`
+	Items       []Item     `json:"items,omitempty"`
+	Reporting   *Reporting `json:"reporting,omitempty"`
 }
 
 type Outcome string
@@ -281,6 +340,39 @@ func (p *problems) links(field string, ls []Link) {
 	}
 }
 
+func (p *problems) items(items []Item) {
+	if len(items) > MaxItems {
+		p.add("items: %d, at most %d", len(items), MaxItems)
+	}
+	seen := map[string]bool{}
+	for i, it := range items {
+		at := fmt.Sprintf("items[%d]", i)
+		switch n := len([]rune(it.ID)); {
+		case n == 0 || n > 64:
+			p.add("%s.id: 1-64 characters", at)
+		case strings.IndexFunc(it.ID, unicode.IsControl) >= 0:
+			p.add("%s.id: no control characters", at)
+		case seen[it.ID]:
+			p.add("%s.id: %q appears twice", at, it.ID)
+		}
+		seen[it.ID] = true
+		if strings.TrimSpace(it.Title) == "" {
+			p.add("%s.title: required", at)
+		}
+		p.long(at+".title", it.Title, 200)
+		if it.Status != "" && it.Status != OK && it.Status != Warn {
+			p.add("%s.status: must be ok or warn", at)
+		}
+		if it.URL != "" {
+			p.url(at, it.URL)
+		}
+		if it.Waiting != nil && !*it.Waiting {
+			p.add("%s.waiting: true, or leave it out", at)
+		}
+		p.long(at+".detail", it.Detail, 500)
+	}
+}
+
 // url checks an http(s) URL with a host, at most 500 characters (code points, like
 // every length in SPEC).
 func (p *problems) url(at, u string) {
@@ -347,15 +439,43 @@ func (p *problems) eventLinks(ls []EventLink) {
 	}
 }
 
-func (c *Component) Validate() error {
+// Validate checks a component as beacon serves it: class required, reporting allowed.
+func (c *Component) Validate() error { return c.validate(true) }
+
+// ValidateProducer checks a component as a producer writes it (beacon put): class optional
+// (service), reporting beacon's alone.
+func (c *Component) ValidateProducer() error { return c.validate(false) }
+
+func (c *Component) validate(served bool) error {
 	var p problems
-	if !ValidName(c.ID) {
+	switch {
+	case c.Class == "" && served:
+		p.add("class: required (service, advisory or list)")
+	case c.Class != "" && !validClass(c.Class):
+		p.add("class: %q is not one of service, advisory, list", c.Class)
+	}
+	if r := c.Reporting; r != nil {
+		if !served {
+			p.add("reporting: is beacon's alone, a producer doesn't write it")
+		} else {
+			if strings.TrimSpace(r.Error) == "" {
+				p.add("reporting.error: required")
+			}
+			p.long("reporting.error", r.Error, 500)
+			if r.Since.IsZero() {
+				p.add("reporting.since: required")
+			}
+		}
+	}
+	p.items(c.Items)
+	// A producer may leave out id and updated_at: beacon put fills them in.
+	if !ValidName(c.ID) && (served || c.ID != "") {
 		p.add("id: %q is not a valid id ([a-z0-9][a-z0-9._-]*, at most 64)", c.ID)
 	}
 	p.long("title", c.Title, 100)
 	p.long("group", c.Group, 50)
 	p.long("description", c.Description, 300)
-	if c.UpdatedAt.IsZero() {
+	if c.UpdatedAt.IsZero() && served {
 		p.add("updated_at: required")
 	}
 	if c.ExpectEvery != "" {
@@ -447,9 +567,11 @@ func (e *Event) Validate() error {
 }
 
 // Decode reads exactly one JSON object into v; unknown fields are an error.
-func Decode(data []byte, v any) error {
-	if len(data) > MaxBytes {
-		return fmt.Errorf("%d bytes, at most %d", len(data), MaxBytes)
+func Decode(data []byte, v any) error { return decode(data, v, MaxBytes) }
+
+func decode(data []byte, v any, max int) error {
+	if len(data) > max {
+		return fmt.Errorf("%d bytes, at most %d", len(data), max)
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -462,7 +584,8 @@ func Decode(data []byte, v any) error {
 	return nil
 }
 
-// ParseComponent decodes and validates a component document.
+// ParseComponent decodes and validates a component document as served (a file in the
+// components folder).
 func ParseComponent(data []byte) (*Component, error) {
 	var c Component
 	if err := Decode(data, &c); err != nil {
@@ -471,16 +594,186 @@ func ParseComponent(data []byte) (*Component, error) {
 	return &c, c.Validate()
 }
 
-// WriteComponent validates c and writes dir/<id>.json atomically.
+// parseOwnComponent reads a file of beacon's own components folder: a missing class
+// means service (files written before classes existed), then the served rules apply.
+func parseOwnComponent(data []byte) (*Component, error) {
+	var c Component
+	if err := Decode(data, &c); err != nil {
+		return nil, err
+	}
+	if c.Class == "" {
+		c.Class = Service
+	}
+	return &c, c.Validate()
+}
+
+// ParseProducerComponent decodes and validates a component as a producer writes it.
+func ParseProducerComponent(data []byte) (*Component, error) {
+	var c Component
+	if err := Decode(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, c.ValidateProducer()
+}
+
+// ParseRun decodes and validates a run document (a log entry).
+func ParseRun(data []byte) (*Run, error) {
+	var r Run
+	if err := Decode(data, &r); err != nil {
+		return nil, err
+	}
+	return &r, r.Validate()
+}
+
+// Adapter is what a state adapter prints: the component's state, without what the
+// definition (id, class, title…) or beacon (reporting) owns.
+type Adapter struct {
+	Status  Status   `json:"status,omitempty"`
+	Summary string   `json:"summary,omitempty"`
+	Gauges  []Metric `json:"gauges,omitempty"`
+	Checks  []Check  `json:"checks,omitempty"`
+	Links   []Link   `json:"links,omitempty"`
+	Items   []Item   `json:"items,omitempty"`
+}
+
+// Validate checks an adapter's output on its own, as the component it would become.
+func (a *Adapter) Validate() error {
+	// What beacon adds around it (id, times, its own checks) must still fit the file limit.
+	if b, err := marshalCompact(a); err == nil && len(b) > MaxBytes-16<<10 {
+		return fmt.Errorf("%d bytes, at most %d", len(b), MaxBytes-16<<10)
+	}
+	return (&Component{ID: "adapter", UpdatedAt: time.Unix(1, 0), Status: a.Status, Summary: a.Summary,
+		Gauges: a.Gauges, Checks: a.Checks, Links: a.Links, Items: a.Items}).ValidateProducer()
+}
+
+// ParseAdapter decodes and validates a state adapter's output.
+func ParseAdapter(data []byte) (*Adapter, error) {
+	var a Adapter
+	if err := Decode(data, &a); err != nil {
+		return nil, err
+	}
+	return &a, a.Validate()
+}
+
+// Box is the box's facts in the envelope.
+type Box struct {
+	OS     string     `json:"os,omitempty"`
+	Kernel string     `json:"kernel,omitempty"`
+	Arch   string     `json:"arch,omitempty"`
+	BootAt *time.Time `json:"boot_at,omitempty"`
+}
+
+// Bounds are the log's first and last seq.
+type Bounds struct {
+	First int64 `json:"first_seq"`
+	Last  int64 `json:"last_seq"`
+}
+
+// Envelope is what GET /v3/state answers.
+type Envelope struct {
+	Schema      int          `json:"schema"`
+	Source      string       `json:"source"`
+	Beacon      string       `json:"beacon"`
+	GeneratedAt time.Time    `json:"generated_at"`
+	Box         *Box         `json:"box"`
+	Log         *Bounds      `json:"log"`
+	Components  []*Component `json:"components"`
+	Invalid     []Invalid    `json:"invalid"`
+}
+
+// MaxEnvelopeBytes bounds what ParseEnvelope reads (a box's whole state).
+const MaxEnvelopeBytes = 64 << 20
+
+func (e *Envelope) Validate() error {
+	var p problems
+	if e.Schema != Schema {
+		p.add("schema: %d, this reads only %d", e.Schema, Schema)
+	}
+	if strings.TrimSpace(e.Source) == "" {
+		p.add("source: required")
+	} else if utf8.RuneCountInString(e.Source) > 64 {
+		p.add("source: at most 64 characters")
+	}
+	if strings.TrimSpace(e.Beacon) == "" {
+		p.add("beacon: required")
+	} else if utf8.RuneCountInString(e.Beacon) > 64 {
+		p.add("beacon: at most 64 characters")
+	}
+	if e.Box == nil {
+		p.add("box: required")
+	}
+	if e.GeneratedAt.IsZero() {
+		p.add("generated_at: required")
+	}
+	if e.Log == nil {
+		p.add("log: required")
+	} else if e.Log.First < 0 || e.Log.Last < e.Log.First {
+		p.add("log: first_seq %d, last_seq %d", e.Log.First, e.Log.Last)
+	}
+	if e.Components == nil {
+		p.add("components: required")
+	}
+	if e.Invalid == nil {
+		p.add("invalid: required")
+	}
+	seen := map[string]bool{}
+	for i, c := range e.Components {
+		if c == nil {
+			p.add("components[%d]: null", i)
+			continue
+		}
+		if err := c.Validate(); err != nil {
+			p.add("components[%d] (%s): %v", i, c.ID, err)
+		}
+		if seen[c.ID] {
+			p.add("components[%d]: id %q appears twice", i, c.ID)
+		}
+		seen[c.ID] = true
+	}
+	for i, inv := range e.Invalid {
+		if inv.File == "" || inv.Error == "" {
+			p.add("invalid[%d]: file and error are required", i)
+		}
+	}
+	return p.err()
+}
+
+// ParseEnvelope decodes and validates a /v3/state answer.
+func ParseEnvelope(data []byte) (*Envelope, error) {
+	var e Envelope
+	if err := decode(data, &e, MaxEnvelopeBytes); err != nil {
+		return nil, err
+	}
+	return &e, e.Validate()
+}
+
+// marshalCompact is JSON without indentation or HTML escaping, and a final newline.
+func marshalCompact(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// WriteComponent validates c (class defaults to service) and writes dir/<id>.json atomically.
 func WriteComponent(dir string, c *Component) error {
+	if c.Class == "" {
+		c.Class = Service
+	}
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(c, "", "  ")
+	data, err := marshalCompact(c)
 	if err != nil {
 		return err
 	}
-	return WriteFileAtomic(filepath.Join(dir, c.ID+ext), append(data, '\n'), 0o644)
+	if len(data) > MaxBytes {
+		return fmt.Errorf("component %s: %d bytes, at most %d", c.ID, len(data), MaxBytes)
+	}
+	return WriteFileAtomic(filepath.Join(dir, c.ID+ext), data, 0o644)
 }
 
 // WriteFileAtomic writes via a temp file + rename, so readers never see half a file.
@@ -531,7 +824,8 @@ func LoadComponents(dir string) ([]*Component, []Invalid, error) {
 		data, err := readRegular(filepath.Join(dir, file))
 		var c *Component
 		if err == nil {
-			c, err = ParseComponent(data)
+			// A file an older beacon wrote has no class: it's a service.
+			c, err = parseOwnComponent(data)
 		}
 		if err == nil && c.ID != id {
 			err = fmt.Errorf("id %q doesn't match the file name", c.ID)

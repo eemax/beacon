@@ -32,7 +32,7 @@ import (
 	"github.com/eemax/beacon/internal/tokens"
 )
 
-// Set at build time: -ldflags "-X main.version=v2.0.0".
+// Set at build time: -ldflags "-X main.version=v3.0.0".
 var version = "dev"
 
 const usage = `beacon: what's happening on this box, served read-only to a hub (lookout).
@@ -45,7 +45,11 @@ Usage:
                [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]...
                                          log an event (reboots are detected by collect)
   beacon run <component> --json FILE|-   log a finished run from a JSON document
-  beacon put <component> [flags]         write a component's state by hand (ad-hoc)
+  beacon put <component> [flags]         write a component's state by hand (ad-hoc; --class, items)
+  beacon check --envelope|--served|--component|--adapter|--run|--definition FILE|-
+                                         check a document (exit 0 valid, 1 invalid, with the reason)
+  beacon check --definitions DIR [--only ID,...]
+                                         run each definition's adapters once and check what they print
   beacon serve                           serve state and log (read-only HTTP API)
   beacon log [--after N] [--limit N]     print log entries
   beacon brief [--since 24h]             the box in short, as Markdown (for people and AI agents)
@@ -71,7 +75,7 @@ func main() {
 	cmd, args := os.Args[1], os.Args[2:]
 	commands := map[string]func([]string) error{
 		"collect": cmdCollect, "exec": cmdExec, "event": cmdEvent, "run": cmdRun, "put": cmdPut,
-		"serve": cmdServe, "log": cmdLog, "brief": cmdBrief, "token": cmdToken, "validate": cmdValidate,
+		"serve": cmdServe, "log": cmdLog, "brief": cmdBrief, "token": cmdToken, "validate": cmdValidate, "check": cmdCheck,
 	}
 	switch cmd {
 	case "version", "--version":
@@ -403,15 +407,17 @@ func cmdPut(args []string) error {
 	title := fs.String("title", "", "display name")
 	group := fs.String("group", "", "heading to group it under")
 	description := fs.String("description", "", "what it is, in a sentence")
+	class := fs.String("class", "", "service (default), advisory or list: what a hub makes of its status")
 	status := fs.String("status", "", "ok, warn, fail or unknown")
 	summary := fs.String("summary", "", "one line about its state")
 	every := fs.String("expect-every", "", "longest normal gap between updates (stale after)")
 	fromJSON := fs.String("json", "", "read the whole document from FILE (- for stdin)")
-	var gauges, checks, primary, links repeated
+	var gauges, checks, primary, links, items repeated
 	fs.Var(&gauges, "gauge", "key[{name=value,…}]=value[:unit[:label]] (repeatable)")
 	fs.Var(&checks, "check", "name[{name=value,…}]=status[:detail] (repeatable)")
 	fs.Var(&primary, "primary", "mark this gauge key as a headline number (repeatable)")
 	fs.Var(&links, "link", "title=url (repeatable)")
+	fs.Var(&items, "item", "id=title[|url=…|waiting|since=RFC3339|status=ok/warn|detail=…] (repeatable; at most 200)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -436,7 +442,7 @@ func cmdPut(args []string) error {
 			return fmt.Errorf("document says id %q, command says %q", c.ID, id)
 		}
 	} else {
-		c = &spec.Component{ID: id, Title: *title, Group: *group, Description: *description, Status: spec.Status(*status),
+		c = &spec.Component{ID: id, Class: spec.Class(*class), Title: *title, Group: *group, Description: *description, Status: spec.Status(*status),
 			Summary: *summary, UpdatedAt: now, ExpectEvery: *every}
 		for _, g := range gauges {
 			m, err := parseMetric(g)
@@ -459,6 +465,13 @@ func cmdPut(args []string) error {
 			}
 			c.Links = append(c.Links, spec.Link{Title: t, URL: u})
 		}
+		for _, it := range items {
+			item, err := parseItem(it)
+			if err != nil {
+				return err
+			}
+			c.Items = append(c.Items, item)
+		}
 		for _, key := range primary {
 			found := false
 			for i := range c.Gauges {
@@ -471,10 +484,131 @@ func cmdPut(args []string) error {
 			}
 		}
 	}
+	if *fromJSON != "" && *class != "" {
+		c.Class = spec.Class(*class)
+	}
+	// What a producer writes: reporting is beacon's alone (it says the state adapter fails).
+	if err := c.ValidateProducer(); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(p.components(), 0o755); err != nil {
 		return err
 	}
 	return spec.WriteComponent(p.components(), c)
+}
+
+// parseItem reads "id=title|key=value|waiting…": the first field is the id and title, the
+// rest (separated by |) set url, since, status, detail, or waiting.
+func parseItem(s string) (spec.Item, error) {
+	parts := strings.Split(s, "|")
+	id, title, ok := strings.Cut(parts[0], "=")
+	if !ok {
+		return spec.Item{}, fmt.Errorf("--item %q: want id=title[|url=…|since=…|status=…|detail=…|waiting]", s)
+	}
+	it := spec.Item{ID: id, Title: title}
+	for _, f := range parts[1:] {
+		k, v, _ := strings.Cut(f, "=")
+		switch k {
+		case "url":
+			it.URL = v
+		case "detail":
+			it.Detail = v
+		case "status":
+			it.Status = spec.Status(v)
+		case "waiting":
+			t := true
+			it.Waiting = &t
+		case "since":
+			at, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				return it, fmt.Errorf("--item %s: since: %v", id, err)
+			}
+			it.Since = &at
+		default:
+			return it, fmt.Errorf("--item %s: unknown field %q", id, k)
+		}
+	}
+	return it, nil
+}
+
+// ---------------------------------------------------------------- check
+
+const checkUsage = "usage: beacon check --envelope|--served|--component|--adapter|--run|--definition FILE|-\n" +
+	"       beacon check --definitions DIR [--only ID,...] [--timeout 30s]"
+
+// documentKinds are the schema's document kinds, each with its validator.
+var documentKinds = map[string]func([]byte) error{
+	"envelope":   func(b []byte) error { _, err := spec.ParseEnvelope(b); return err },
+	"served":     func(b []byte) error { _, err := spec.ParseComponent(b); return err },
+	"component":  func(b []byte) error { _, err := spec.ParseProducerComponent(b); return err },
+	"adapter":    func(b []byte) error { _, err := spec.ParseAdapter(b); return err },
+	"run":        func(b []byte) error { _, err := spec.ParseRun(b); return err },
+	"definition": func(b []byte) error { _, err := collect.ParseDefinition(b); return err },
+}
+
+// cmdCheck checks a document against the schema (exit 0 valid, 1 invalid with the reason),
+// or runs each definition's adapters once and checks what they print. It writes nothing.
+func cmdCheck(args []string) error {
+	fs := flag.NewFlagSet("beacon check", flag.ContinueOnError)
+	files := map[string]*string{}
+	for kind := range documentKinds {
+		files[kind] = fs.String(kind, "", "check a "+kind+" document from FILE (- for stdin)")
+	}
+	defsDir := fs.String("definitions", "", "run each definition's adapters in DIR once and check their output")
+	only := fs.String("only", "", "with --definitions: only these ids (comma-separated)")
+	timeout := fs.Duration("timeout", 30*time.Second, "with --definitions: time limit per adapter")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	chosen := ""
+	n := 0
+	for kind, f := range files {
+		if *f != "" {
+			chosen, n = kind, n+1
+		}
+	}
+	if *defsDir != "" {
+		n++
+	}
+	if n != 1 || fs.NArg() > 0 || (*only != "" && *defsDir == "") {
+		return usageError{checkUsage}
+	}
+	if *defsDir != "" {
+		var ids []string
+		for _, id := range strings.Split(*only, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				ids = append(ids, id)
+			}
+		}
+		if *only != "" && len(ids) == 0 {
+			return usageError{checkUsage}
+		}
+		lines, bad := collect.CheckDefinitions(context.Background(), *defsDir, ids, *timeout)
+		for _, l := range lines {
+			fmt.Println(l)
+		}
+		if bad > 0 {
+			return exitError(1)
+		}
+		return nil
+	}
+	data, err := readInput(*files[chosen])
+	if err != nil {
+		return err
+	}
+	if len(data) > spec.MaxEnvelopeBytes {
+		return exitCheck(chosen, fmt.Errorf("%d bytes, too big", len(data)))
+	}
+	if err := documentKinds[chosen](data); err != nil {
+		return exitCheck(chosen, err)
+	}
+	return nil
+}
+
+// exitCheck prints why a document is invalid and exits 1.
+func exitCheck(kind string, err error) error {
+	fmt.Fprintf(os.Stderr, "invalid %s: %s\n", kind, strings.TrimSpace(err.Error()))
+	return exitError(1)
 }
 
 // splitLabels splits "key{a=b,c=d}" into the key and its labels.
@@ -672,11 +806,22 @@ func cmdValidate(args []string) error {
 		return err
 	}
 	for _, c := range comps {
-		fmt.Printf("ok   component %s\n", c.ID)
+		extra := ""
+		if c.Class != spec.Service {
+			extra = " [" + string(c.Class) + "]"
+		}
+		if c.Reporting != nil {
+			extra += " (reporting broken since " + c.Reporting.Since.Format(time.RFC3339) + ")"
+		}
+		fmt.Printf("ok   component %s%s\n", c.ID, extra)
 	}
 	defs, defInvalid := collect.Definitions(p.definitions())
 	for _, id := range slices.Sorted(maps.Keys(defs)) {
-		fmt.Printf("ok   definition %s\n", id)
+		extra := ""
+		if cl := defs[id].Class; cl != "" && cl != spec.Service {
+			extra = " [" + string(cl) + "]"
+		}
+		fmt.Printf("ok   definition %s%s\n", id, extra)
 	}
 	for _, i := range append(invalid, defInvalid...) {
 		bad++

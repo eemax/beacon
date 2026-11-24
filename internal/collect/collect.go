@@ -51,11 +51,12 @@ type Config struct {
 // Definition says what a component is and where its data comes from
 // (/etc/beacon/components.d/<id>.json).
 type Definition struct {
-	ID          string `json:"id"`
-	Title       string `json:"title,omitempty"`
-	Group       string `json:"group,omitempty"`
-	Description string `json:"description,omitempty"`
-	ExpectEvery string `json:"expect_every,omitempty"` // default 10m (collect runs every minute)
+	ID          string     `json:"id"`
+	Class       spec.Class `json:"class,omitempty"` // service (default), advisory or list
+	Title       string     `json:"title,omitempty"`
+	Group       string     `json:"group,omitempty"`
+	Description string     `json:"description,omitempty"`
+	ExpectEvery string     `json:"expect_every,omitempty"` // default 10m (collect runs every minute)
 	Systemd     *struct {
 		Units   []string `json:"units"`
 		Timers  []string `json:"timers,omitempty"`
@@ -67,16 +68,28 @@ type Definition struct {
 		Interval string `json:"interval,omitempty"` // without timers: next run = last start + interval
 	} `json:"schedule,omitempty"`
 	Probes []probe.Probe `json:"probes,omitempty"` // HTTP(S)/TCP checks, as a client would see the service
-	State  string        `json:"state,omitempty"`  // command printing {status, summary, gauges, checks, links}
+	State  string        `json:"state,omitempty"`  // command printing {status, summary, gauges, checks, links, items}
 	// How often to run the state adapter (default: every collect). Between runs its last
 	// result is reused, so a slow or rate-limited adapter needn't run every minute.
 	StateEvery string `json:"state_every,omitempty"`
 	Run        string `json:"run,omitempty"` // command printing {summary, stats, artifacts, error} for a finished run
 }
 
-func (d *Definition) validate(file string) error {
-	if !spec.ValidName(d.ID) || d.ID+".json" != file {
-		return fmt.Errorf("id %q must be a valid id and match the file name", d.ID)
+// ParseDefinition decodes and validates a definition document.
+func ParseDefinition(data []byte) (*Definition, error) {
+	var d Definition
+	if err := spec.Decode(data, &d); err != nil {
+		return nil, err
+	}
+	return &d, d.validate()
+}
+
+func (d *Definition) validate() error {
+	if !spec.ValidName(d.ID) {
+		return fmt.Errorf("id %q must be a valid id", d.ID)
+	}
+	if d.Class != "" && d.Class != spec.Service && d.Class != spec.Advisory && d.Class != spec.List {
+		return fmt.Errorf("class: %q is not one of service, advisory, list", d.Class)
 	}
 	if d.ID == "host" {
 		return errors.New(`id "host" is beacon's built-in component`)
@@ -115,11 +128,19 @@ func (d *Definition) validate(file string) error {
 	}
 	// What the definition puts into the component (title, expect_every, schedule) must be
 	// valid there, or every collect would fail to write it.
-	c := spec.Component{ID: d.ID, Title: d.Title, Group: d.Group, Description: d.Description, UpdatedAt: time.Unix(1, 0), ExpectEvery: d.ExpectEvery}
+	c := spec.Component{ID: d.ID, Class: d.class(), Title: d.Title, Group: d.Group, Description: d.Description, UpdatedAt: time.Unix(1, 0), ExpectEvery: d.ExpectEvery}
 	if d.Schedule != nil {
 		c.Schedule = &spec.Schedule{Grace: d.Schedule.Grace, Every: d.Schedule.Every}
 	}
 	return c.Validate()
+}
+
+// class is the definition's class, service when unset.
+func (d *Definition) class() spec.Class {
+	if d.Class == "" {
+		return spec.Service
+	}
+	return d.Class
 }
 
 // Definitions reads components.d; a broken file is reported, not fatal.
@@ -132,18 +153,18 @@ func Definitions(dir string) (map[string]*Definition, []spec.Invalid) {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		var d Definition
+		var d *Definition
 		if err == nil {
-			err = spec.Decode(data, &d)
+			d, err = ParseDefinition(data)
 		}
-		if err == nil {
-			err = d.validate(e.Name())
+		if err == nil && d.ID+".json" != e.Name() {
+			err = fmt.Errorf("id %q must match the file name", d.ID)
 		}
 		if err != nil {
 			invalid = append(invalid, spec.Invalid{File: "components.d/" + e.Name(), Error: err.Error()})
 			continue
 		}
-		defs[d.ID] = &d
+		defs[d.ID] = d
 	}
 	return defs, invalid
 }
@@ -334,16 +355,8 @@ func Run(ctx context.Context, cfg Config) (*Result, error) {
 	return res, nil
 }
 
-type stateOutput struct {
-	Status  spec.Status   `json:"status,omitempty"`
-	Summary string        `json:"summary,omitempty"`
-	Gauges  []spec.Metric `json:"gauges,omitempty"`
-	Checks  []spec.Check  `json:"checks,omitempty"`
-	Links   []spec.Link   `json:"links,omitempty"`
-}
-
 func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.Timer, now time.Time, res *Result) error {
-	c := &spec.Component{ID: d.ID, Title: d.Title, Group: d.Group, Description: d.Description, UpdatedAt: now, ExpectEvery: d.ExpectEvery}
+	c := &spec.Component{ID: d.ID, Class: d.class(), Title: d.Title, Group: d.Group, Description: d.Description, UpdatedAt: now, ExpectEvery: d.ExpectEvery}
 	if c.ExpectEvery == "" {
 		c.ExpectEvery = "10m"
 	}
@@ -444,24 +457,13 @@ func component(ctx context.Context, cfg Config, d *Definition, timers []systemd.
 		c.Schedule = s
 	}
 
-	// State adapter: gauges, checks, summary, status, links.
+	// State adapter: gauges, checks, summary, status, links, items. When it fails, times
+	// out or prints an invalid document, the component keeps its last good output with
+	// `reporting` set: a broken report is never the app being down.
 	if d.State != "" {
-		out, err := stateAdapter(ctx, cfg, d, now)
-		var so stateOutput
-		if err == nil {
-			err = spec.Decode(out, &so)
-		}
-		if err == nil {
-			// Validate the adapter's part on its own, so a bad document reads as the
-			// adapter's fault (with the reason) instead of leaving the component unwritten.
-			err = (&spec.Component{ID: d.ID, UpdatedAt: now, Status: so.Status, Summary: so.Summary, Gauges: so.Gauges, Checks: so.Checks, Links: so.Links}).Validate()
-		}
-		if err != nil {
-			c.Status, c.Summary = spec.Fail, truncate("state adapter failed: "+oneLine(err.Error()), 500)
-		} else {
-			c.Status, c.Summary, c.Links = so.Status, so.Summary, so.Links
-			c.Gauges, c.Checks = append(so.Gauges, c.Gauges...), append(so.Checks, c.Checks...) // the adapter's first
-		}
+		so, rep := adapterState(ctx, cfg, d, now)
+		c.Status, c.Summary, c.Links, c.Items, c.Reporting = so.Status, so.Summary, so.Links, so.Items, rep
+		c.Gauges, c.Checks = append(so.Gauges, c.Gauges...), append(so.Checks, c.Checks...) // the adapter's first
 	}
 	// Probes: rows of their own (probe=…), after the adapter's, so they're never lost to it.
 	for i, p := range d.Probes {
@@ -498,21 +500,84 @@ type cached struct {
 	Error string          `json:"error,omitempty"`
 }
 
+// lastGood is a component's last good state adapter output, kept beside beacon's state
+// file (good/<id>.json): what the component shows while the adapter fails. At is zero
+// until there's one; FailingSince is when the current failure began, zero while it works.
+type lastGood struct {
+	At           time.Time       `json:"at,omitzero"`
+	Out          json.RawMessage `json:"out,omitempty"`
+	FailingSince time.Time       `json:"failing_since,omitzero"`
+}
+
+func goodPath(cfg Config, id string) string {
+	return filepath.Join(filepath.Dir(cfg.State), "good", id+".json")
+}
+
+func readGood(cfg Config, id string) lastGood {
+	var g lastGood
+	if data, err := os.ReadFile(goodPath(cfg, id)); err == nil && json.Unmarshal(data, &g) == nil {
+		return g
+	}
+	return lastGood{}
+}
+
+func writeGood(cfg Config, id string, g lastGood) {
+	path := goodPath(cfg, id)
+	if data, err := json.Marshal(g); err == nil && os.MkdirAll(filepath.Dir(path), 0o700) == nil {
+		spec.WriteFileAtomic(path, data, 0o600)
+	}
+}
+
+// adapterState is d's state adapter's part of its component, and the reporting that says
+// the adapter is failing (nil while it works). A good output replaces the kept one and
+// clears reporting at once; a failure (non-zero exit, timeout, not JSON, an invalid
+// document, class or reporting included) keeps the last good output, or with none yet
+// reads unknown, and never fail on that account.
+func adapterState(ctx context.Context, cfg Config, d *Definition, now time.Time) (spec.Adapter, *spec.Reporting) {
+	out, at, err := stateAdapter(ctx, cfg, d, now)
+	var a *spec.Adapter
+	if err == nil {
+		a, err = spec.ParseAdapter(out)
+	}
+	good := readGood(cfg, d.ID)
+	if err == nil {
+		if !good.At.Equal(at) || !good.FailingSince.IsZero() {
+			writeGood(cfg, d.ID, lastGood{At: at, Out: out})
+		}
+		return *a, nil
+	}
+	if good.FailingSince.IsZero() {
+		good.FailingSince = now
+		writeGood(cfg, d.ID, good)
+	}
+	msg := truncate("state adapter failed: "+oneLine(err.Error()), 500)
+	rep := &spec.Reporting{Error: msg, Since: good.FailingSince}
+	if !good.At.IsZero() {
+		if kept, kerr := spec.ParseAdapter(good.Out); kerr == nil {
+			last := good.At
+			rep.LastGoodAt = &last
+			return *kept, rep
+		}
+	}
+	return spec.Adapter{Status: spec.Unknown}, rep // the reason is in reporting.error
+}
+
 // stateAdapter runs d's state adapter, or reuses its last result while that's younger than
-// state_every. Failures are kept too: a failing slow adapter isn't retried every minute.
-func stateAdapter(ctx context.Context, cfg Config, d *Definition, now time.Time) ([]byte, error) {
+// state_every (failures are kept too: a failing slow adapter isn't retried every minute).
+// at is when the output was produced.
+func stateAdapter(ctx context.Context, cfg Config, d *Definition, now time.Time) (out []byte, at time.Time, err error) {
 	every, _ := spec.ParseDuration(d.StateEvery)
 	path := filepath.Join(filepath.Dir(cfg.State), "cache", d.ID+".json")
 	if every > 0 {
 		var c cached
 		if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &c) == nil && now.Sub(c.At) < every && !c.At.After(now) {
 			if c.Error != "" {
-				return nil, errors.New(c.Error)
+				return nil, c.At, errors.New(c.Error)
 			}
-			return c.Out, nil
+			return c.Out, c.At, nil
 		}
 	}
-	out, err := runCommand(ctx, d.State, []string{"BEACON_COMPONENT=" + d.ID}, cfg.Timeout)
+	out, err = RunCommand(ctx, d.State, []string{"BEACON_COMPONENT=" + d.ID}, cfg.Timeout)
 	if every > 0 {
 		c := cached{At: now}
 		if err != nil {
@@ -526,7 +591,7 @@ func stateAdapter(ctx context.Context, cfg Config, d *Definition, now time.Time)
 			spec.WriteFileAtomic(path, data, 0o600)
 		}
 	}
-	return out, err
+	return out, now, err
 }
 
 // fit keeps a component within the SPEC limits once the adapter's, the services' and the
@@ -717,27 +782,11 @@ func FinishRun(ctx context.Context, cfg Config, d *Definition, run *spec.Run) er
 			"BEACON_RUN_OUTCOME=" + string(run.Outcome), "BEACON_RUN_EXIT_CODE=" + exit,
 			"BEACON_RUN_STARTED_AT=" + run.StartedAt.Format(time.RFC3339), "BEACON_RUN_ENDED_AT=" + run.EndedAt.Format(time.RFC3339),
 		}
-		out, err := runCommand(ctx, d.Run, env, cfg.Timeout)
-		var extra struct {
-			Summary   string        `json:"summary,omitempty"`
-			Stats     []spec.Metric `json:"stats,omitempty"`
-			Artifacts []spec.Link   `json:"artifacts,omitempty"`
-			Error     string        `json:"error,omitempty"`
-		}
-		if err == nil {
-			err = spec.Decode(out, &extra)
-		}
+		out, err := RunCommand(ctx, d.Run, env, cfg.Timeout)
 		if err == nil {
 			// Checked on a copy: a bad adapter document must never cost the run itself.
-			merged := *run
-			if extra.Summary != "" {
-				merged.Summary = truncate(extra.Summary, 500)
-			}
-			merged.Stats, merged.Artifacts = extra.Stats, extra.Artifacts
-			if extra.Error != "" {
-				merged.Error = truncate(extra.Error, 2000)
-			}
-			if err = merged.Validate(); err == nil {
+			var merged spec.Run
+			if merged, err = mergeRunAdapter(out, *run); err == nil {
 				*run = merged
 			}
 		}
@@ -772,9 +821,117 @@ func FinishRun(ctx context.Context, cfg Config, d *Definition, run *spec.Run) er
 	})
 }
 
-// runCommand runs an adapter in its own process group (all of it killed on timeout) and
+// mergeRunAdapter adds a run adapter's document ({summary, stats, artifacts, error}) to
+// run, and checks the result as a run.
+func mergeRunAdapter(out []byte, run spec.Run) (spec.Run, error) {
+	var extra struct {
+		Summary   string        `json:"summary,omitempty"`
+		Stats     []spec.Metric `json:"stats,omitempty"`
+		Artifacts []spec.Link   `json:"artifacts,omitempty"`
+		Error     string        `json:"error,omitempty"`
+	}
+	if err := spec.Decode(out, &extra); err != nil {
+		return run, err
+	}
+	if extra.Summary != "" {
+		run.Summary = truncate(extra.Summary, 500)
+	}
+	run.Stats, run.Artifacts = extra.Stats, extra.Artifacts
+	if extra.Error != "" {
+		run.Error = truncate(extra.Error, 2000)
+	}
+	return run, run.Validate()
+}
+
+// CheckDefinitions is `beacon check --definitions`: it runs each definition's state
+// adapter (checked as an adapter) and run adapter (checked as a run: its document merged
+// into a finished run of the component) once, with BEACON_COMPONENT set, and returns a
+// line per definition, "ok <id>" or "BAD <id>: <why>", and how many are bad. only limits
+// it to those ids (an id without a definition is bad). A dir it can't read, or one with
+// no definition in it, is bad too. It needs no systemd and writes nothing.
+func CheckDefinitions(ctx context.Context, dir string, only []string, timeout time.Duration) ([]string, int) {
+	var lines []string
+	bad := 0
+	report := func(id string, problems []string) {
+		if len(problems) == 0 {
+			lines = append(lines, "ok "+id)
+			return
+		}
+		bad++
+		lines = append(lines, "BAD "+id+": "+strings.Join(problems, "; "))
+	}
+	want := map[string]bool{}
+	for _, id := range only {
+		want[id] = true
+	}
+	found := map[string]bool{}
+	// The deploy gate: a directory that can't be read, or holds no definition to check,
+	// is bad, never a pass that checked nothing.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		report(dir, []string{"definitions: " + oneLine(err.Error())})
+		return lines, bad
+	}
+	for _, e := range entries {
+		id, isJSON := strings.CutSuffix(e.Name(), ".json")
+		if !isJSON || !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || (len(want) > 0 && !want[id]) {
+			continue
+		}
+		found[id] = true
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		var d *Definition
+		if err == nil {
+			d, err = ParseDefinition(data)
+		}
+		if err == nil && d.ID != id {
+			err = fmt.Errorf("id %q must match the file name", d.ID)
+		}
+		if err != nil {
+			report(id, []string{"definition: " + oneLine(err.Error())})
+			continue
+		}
+		var problems []string
+		if d.State != "" {
+			out, err := RunCommand(ctx, d.State, []string{"BEACON_COMPONENT=" + d.ID}, timeout)
+			if err == nil {
+				_, err = spec.ParseAdapter(out)
+			}
+			if err != nil {
+				problems = append(problems, "state adapter: "+truncate(oneLine(err.Error()), 300))
+			}
+		}
+		if d.Run != "" {
+			now := time.Now().UTC().Truncate(time.Second)
+			code := 0
+			env := []string{
+				"BEACON_COMPONENT=" + d.ID, "BEACON_RUN_ID=check", "BEACON_RUN_UNIT=", "BEACON_RUN_OUTCOME=success", "BEACON_RUN_EXIT_CODE=0",
+				"BEACON_RUN_STARTED_AT=" + now.Format(time.RFC3339), "BEACON_RUN_ENDED_AT=" + now.Format(time.RFC3339),
+			}
+			out, err := RunCommand(ctx, d.Run, env, timeout)
+			if err == nil {
+				_, err = mergeRunAdapter(out, spec.Run{Type: "run", Component: d.ID, ID: "check", StartedAt: now, EndedAt: now, Outcome: spec.Success, ExitCode: &code})
+			}
+			if err != nil {
+				problems = append(problems, "run adapter: "+truncate(oneLine(err.Error()), 300))
+			}
+		}
+		report(id, problems)
+	}
+	for _, id := range only {
+		if !found[id] {
+			found[id] = true
+			report(id, []string{"no definition"})
+		}
+	}
+	if len(found) == 0 {
+		report(dir, []string{"no definitions"})
+	}
+	return lines, bad
+}
+
+// RunCommand runs an adapter in its own process group (all of it killed on timeout) and
 // returns its stdout; stderr's last line explains a failure.
-func runCommand(ctx context.Context, path string, env []string, timeout time.Duration) ([]byte, error) {
+func RunCommand(ctx context.Context, path string, env []string, timeout time.Duration) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path)
