@@ -233,6 +233,25 @@ func Write(w io.Writer, in Input) error {
 			fmt.Fprintf(&b, ": %s", oneLine(r.d.Reason))
 		}
 		b.WriteString("\n")
+		if c.Class != "" && c.Class != spec.Service {
+			fmt.Fprintf(&b, "  - class: %s (a hub only suggests on it, never pages)\n", c.Class)
+		}
+		if rep := c.Reporting; rep != nil {
+			last := "there was no good output yet"
+			if rep.LastGoodAt != nil {
+				last = "what follows is its last good output, from " + stamp(*rep.LastGoodAt)
+			}
+			fmt.Fprintf(&b, "  - reporting broken since %s: %s; %s (the app itself isn't known to be down)\n", stamp(rep.Since), oneLine(clip(rep.Error, 200)), last)
+		}
+		if n := len(c.Items); n > 0 {
+			waiting := 0
+			for _, it := range c.Items {
+				if it.Waiting != nil && *it.Waiting {
+					waiting++
+				}
+			}
+			fmt.Fprintf(&b, "  - %d items, %d waiting\n", n, waiting)
+		}
 		if bad := badChecks(c.Checks); len(bad) > 1 {
 			for _, k := range bad {
 				fmt.Fprintf(&b, "  - %s %s\n", k.Status, oneLine(checkText(k)))
