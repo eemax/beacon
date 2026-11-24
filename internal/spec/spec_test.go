@@ -3,6 +3,7 @@ package spec
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -206,5 +207,41 @@ func TestKindsAreTokens(t *testing.T) {
 		if !token.MatchString(string(k)) {
 			t.Errorf("kind %q isn't a token", k)
 		}
+	}
+}
+
+func TestLoadComponentsFillsClass(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "x.json"), []byte(`{"id":"x","updated_at":"2026-11-24T00:00:00Z","status":"ok"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	comps, invalid, err := LoadComponents(dir)
+	if err != nil || len(invalid) != 0 || len(comps) != 1 || comps[0].Class != Service {
+		t.Fatalf("got %v %v %v", comps, invalid, err)
+	}
+}
+
+func TestWriteComponentBoundsSize(t *testing.T) {
+	var items []Item
+	for i := 0; i < 200; i++ {
+		items = append(items, Item{ID: fmt.Sprint("i", i), Title: "t", Detail: strings.Repeat("<&>", 160)})
+	}
+	dir := t.TempDir()
+	c := &Component{ID: "q", Class: List, UpdatedAt: time.Now(), Status: OK, Items: items}
+	if err := WriteComponent(dir, c); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadComponents(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, inv, _ := LoadComponents(dir); len(inv) != 0 {
+		t.Fatalf("written file refused: %v", inv)
+	}
+}
+
+func TestEnvelopeSourceAndBox(t *testing.T) {
+	e := Envelope{Schema: Schema, Source: strings.Repeat("a", 80), Beacon: "v3", GeneratedAt: time.Now(), Log: &Bounds{}, Components: []*Component{}, Invalid: []Invalid{}}
+	if e.Validate() == nil {
+		t.Fatal("long source and missing box accepted")
 	}
 }

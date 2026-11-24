@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -593,6 +594,19 @@ func ParseComponent(data []byte) (*Component, error) {
 	return &c, c.Validate()
 }
 
+// parseOwnComponent reads a file of beacon's own components folder: a missing class
+// means service (files written before classes existed), then the served rules apply.
+func parseOwnComponent(data []byte) (*Component, error) {
+	var c Component
+	if err := Decode(data, &c); err != nil {
+		return nil, err
+	}
+	if c.Class == "" {
+		c.Class = Service
+	}
+	return &c, c.Validate()
+}
+
 // ParseProducerComponent decodes and validates a component as a producer writes it.
 func ParseProducerComponent(data []byte) (*Component, error) {
 	var c Component
@@ -624,6 +638,10 @@ type Adapter struct {
 
 // Validate checks an adapter's output on its own, as the component it would become.
 func (a *Adapter) Validate() error {
+	// What beacon adds around it (id, times, its own checks) must still fit the file limit.
+	if b, err := marshalCompact(a); err == nil && len(b) > MaxBytes-16<<10 {
+		return fmt.Errorf("%d bytes, at most %d", len(b), MaxBytes-16<<10)
+	}
 	return (&Component{ID: "adapter", UpdatedAt: time.Unix(1, 0), Status: a.Status, Summary: a.Summary,
 		Gauges: a.Gauges, Checks: a.Checks, Links: a.Links, Items: a.Items}).ValidateProducer()
 }
@@ -657,7 +675,7 @@ type Envelope struct {
 	Source      string       `json:"source"`
 	Beacon      string       `json:"beacon"`
 	GeneratedAt time.Time    `json:"generated_at"`
-	Box         Box          `json:"box"`
+	Box         *Box         `json:"box"`
 	Log         *Bounds      `json:"log"`
 	Components  []*Component `json:"components"`
 	Invalid     []Invalid    `json:"invalid"`
@@ -673,9 +691,16 @@ func (e *Envelope) Validate() error {
 	}
 	if strings.TrimSpace(e.Source) == "" {
 		p.add("source: required")
+	} else if utf8.RuneCountInString(e.Source) > 64 {
+		p.add("source: at most 64 characters")
 	}
 	if strings.TrimSpace(e.Beacon) == "" {
 		p.add("beacon: required")
+	} else if utf8.RuneCountInString(e.Beacon) > 64 {
+		p.add("beacon: at most 64 characters")
+	}
+	if e.Box == nil {
+		p.add("box: required")
 	}
 	if e.GeneratedAt.IsZero() {
 		p.add("generated_at: required")
@@ -722,6 +747,17 @@ func ParseEnvelope(data []byte) (*Envelope, error) {
 	return &e, e.Validate()
 }
 
+// marshalCompact is JSON without indentation or HTML escaping, and a final newline.
+func marshalCompact(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 // WriteComponent validates c (class defaults to service) and writes dir/<id>.json atomically.
 func WriteComponent(dir string, c *Component) error {
 	if c.Class == "" {
@@ -730,11 +766,14 @@ func WriteComponent(dir string, c *Component) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(c, "", "  ")
+	data, err := marshalCompact(c)
 	if err != nil {
 		return err
 	}
-	return WriteFileAtomic(filepath.Join(dir, c.ID+ext), append(data, '\n'), 0o644)
+	if len(data) > MaxBytes {
+		return fmt.Errorf("component %s: %d bytes, at most %d", c.ID, len(data), MaxBytes)
+	}
+	return WriteFileAtomic(filepath.Join(dir, c.ID+ext), data, 0o644)
 }
 
 // WriteFileAtomic writes via a temp file + rename, so readers never see half a file.
@@ -785,7 +824,8 @@ func LoadComponents(dir string) ([]*Component, []Invalid, error) {
 		data, err := readRegular(filepath.Join(dir, file))
 		var c *Component
 		if err == nil {
-			c, err = ParseComponent(data)
+			// A file an older beacon wrote has no class: it's a service.
+			c, err = parseOwnComponent(data)
 		}
 		if err == nil && c.ID != id {
 			err = fmt.Errorf("id %q doesn't match the file name", c.ID)

@@ -101,7 +101,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	if !facts.BootAt.IsZero() {
 		box.BootAt = &facts.BootAt
 	}
-	body := spec.Envelope{Schema: spec.Schema, Source: s.Source, Beacon: s.Version, Box: box, Log: &spec.Bounds{First: first, Last: last}, Components: comps, Invalid: invalid}
+	body := spec.Envelope{Schema: spec.Schema, Source: s.Source, Beacon: s.Version, Box: &box, Log: &spec.Bounds{First: first, Last: last}, Components: comps, Invalid: invalid}
 	// The ETag covers the content only (not generated_at), so an unchanged box gets 304.
 	content, _ := json.Marshal(body)
 	sum := sha256.Sum256(content)
