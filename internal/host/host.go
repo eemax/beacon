@@ -29,7 +29,7 @@ const (
 	RebootNights = 3
 )
 
-// Facts describe the box (served as "box" in /v2/state). BootID changes on every boot.
+// Facts describe the box (served as "box" in /v3/state). BootID changes on every boot.
 type Facts struct {
 	OS     string    `json:"os,omitempty"`
 	Kernel string    `json:"kernel,omitempty"`

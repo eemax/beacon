@@ -8,7 +8,8 @@ Type=oneshot
 EnvironmentFile=-/etc/beacon/beacon.env
 # Runs as root: it reads systemd and the journal, and adapters often need root-only
 # state (databases, logs). Only root can add definitions (/etc/beacon/components.d).
-# "-": a failing adapter is reported in its own component (status fail); it shouldn't
+# "-": a failing adapter is reported in its own component (`reporting`, its last good state
+# kept); it shouldn't
 # also leave this unit failed every minute.
 ExecStart=-/usr/local/bin/beacon collect
 Nice=10

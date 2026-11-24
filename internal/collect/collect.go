@@ -559,7 +559,7 @@ func adapterState(ctx context.Context, cfg Config, d *Definition, now time.Time)
 			return *kept, rep
 		}
 	}
-	return spec.Adapter{Status: spec.Unknown, Summary: msg}, rep
+	return spec.Adapter{Status: spec.Unknown}, rep // the reason is in reporting.error
 }
 
 // stateAdapter runs d's state adapter, or reuses its last result while that's younger than
