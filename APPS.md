@@ -276,8 +276,11 @@ The installer that deploys your app (not the app itself) checks before it instal
 logs a deploy event after:
 
 ```bash
-# before the new version goes live: what its adapters print must still be valid
-beacon check --definitions /etc/beacon/components.d --only <id> || exit 1
+# before the new version goes live: stage the new app, adapters and definitions in a
+# directory (not /etc/beacon/components.d, whose adapters call the version still
+# installed), with the definitions' commands pointing at the staged copy, and check that
+beacon check --definitions "$STAGE/components.d" --only <id> || exit 1
+# only then install: move $STAGE into place
 
 # after: a deploy event, so changes line up with what happened on the timeline
 if command -v beacon >/dev/null; then
@@ -287,7 +290,8 @@ if command -v beacon >/dev/null; then
 fi
 ```
 
-`beacon check --definitions` runs each listed definition's state adapter and run adapter
+Check the staged copy, never the installed one: the installed definitions' adapters call
+the old version, so they would pass whatever the new one breaks. `beacon check --definitions` runs each listed definition's state adapter and run adapter
 once and checks what they print (a run adapter only reads, so that's safe), writing
 nothing; it exits 1 on any bad one, so a deploy that would break a report is refused
 there, before the new version goes live. Log the deploy event only when the version actually

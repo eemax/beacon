@@ -286,7 +286,9 @@ run that started and ended now, and checks the result as a run. It prints `ok <i
 `BAD <id>: <why>` per definition, writes nothing (no component, no log entry), and exits 1
 on any BAD or an `--only` id with no definition. An app runs `beacon check --adapter` in its
 own tests and the box runs `beacon check --definitions` at deploy, so a change that would
-break a report is refused before it's installed.
+break a report is refused before it's installed. The check has to run against the staged new
+definitions, adapters and app (a DIR holding them, whose commands call the staged app), not
+the installed ones: those call the old version and would pass whatever the new one breaks.
 
 Unknown fields are invalid in every kind beacon checks, so a typo fails loudly. A hub
 ignores fields it doesn't know in what it reads (envelope, served, run), so a new optional
