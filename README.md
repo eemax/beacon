@@ -55,6 +55,7 @@ didn't happen (`schedule.grace` after it was due).
 | Field | |
 |---|---|
 | `id` | the file name without `.json`; `[a-z0-9][a-z0-9._-]*` |
+| `class` | what the component is for, so what a hub makes of it: `service` (the default: something people rely on; `fail` pages), `advisory` (advice: a doctor's findings, outdated software, a cost note; only ever a suggestion) or `list` (things to do or waiting on someone, in `items`; only ever a suggestion) |
 | `title`, `group`, `description` | for the hub. `group` puts related components together |
 | `systemd.units` | units whose invocations are runs of this component |
 | `systemd.timers` | timers that start them: the schedule, and the `timer` trigger |
@@ -78,14 +79,31 @@ arguments, run as root, 30 s limit) that prints one JSON object:
   `BEACON_RUN_STARTED_AT`, `BEACON_RUN_ENDED_AT`) and prints what that run did:
   `{"summary", "stats": [Metric], "artifacts": [Link], "error"}`;
 - the **state adapter** prints what the component is now:
-  `{"status", "summary", "gauges": [Metric], "checks": [Check], "links": [Link]}`.
+  `{"status", "summary", "gauges": [Metric], "checks": [Check], "links": [Link], "items": [Item]}`.
+  `class` is the definition's and `reporting` is beacon's: both are invalid in what an
+  adapter prints, as is any unknown field.
 
-Every field is optional. Shapes are in SPEC.md. beacon checks what adapters print: a
-failing or invalid state adapter turns the component `fail` with the reason; a failing or
+Every field is optional. Shapes are in SPEC.md. beacon checks what adapters print.
+
+**reporting**: when a state adapter fails, times out or prints an invalid document, the
+component keeps the adapter's **last good output** (kept beside beacon's state file, in
+`good/`) and gets `reporting: {error, since, last_good_at}`; its status is never `fail` on
+that account, and a hub reads it as "reporting broken", not as the app down. The first
+good output clears it. With no good output yet, the status is `unknown` and `last_good_at`
+is `null`. Runs, schedule, services and probes keep updating meanwhile. A failing or
 invalid run adapter never costs the run (it's logged as systemd saw it, and the component
 warns until the adapter works again). A timer listed in the definition that isn't
 scheduled (stopped, disabled) is a warning too, since without it nothing can be missed
 (while the unit it starts is running, systemd shows no next run: that counts as scheduled).
+
+**Check an adapter before it goes live** (a deploy should refuse one that would break a
+report): `beacon check --adapter FILE|-` checks a document an adapter printed, and
+`beacon check --definitions DIR [--only ID,...]` runs each definition's state adapter
+(checked as an adapter) and run adapter (its document merged into a made-up finished run
+and checked as a run) once, with `BEACON_COMPONENT` set and the collect timeout, and
+prints `ok <id>` or `BAD <id>: <why>` for each. It exits 1 when any is bad, an `--only`
+id has no definition, or DIR can't be read or holds no definition (`BAD DIR: …`: a gate
+that checked nothing never passes); it needs no systemd and writes nothing.
 
 Adapters describe, the hub presents (SPEC.md → How a hub presents it): mark the headline
 numbers `primary`, give metrics a `unit`, and put **labels** on metrics and checks that
@@ -175,6 +193,16 @@ runs and events (`--since 72h` for more). Times are RFC 3339 UTC. Point an agent
 instructions at it ("for the box's current state, run `beacon brief`") instead of pasting
 status into its prompt.
 
+## The API (schema 3)
+
+`GET /v3/state` answers `{schema: 3, source, beacon, generated_at, box, log, components,
+invalid}` with an `ETag`; `GET /v3/log?after=N&limit=N` the runs and events after a seq. Every
+component carries its `class`, its `items` (at most 200: things to do or waiting, shown
+and never judged) and, only while its state adapter fails, `reporting`. Schema 3 replaced
+schema 2 outright (beacon v3.0.0): `/v2/*` is `404`, and a component file written by an
+older beacon (without a class) is listed as invalid until its next collect or `beacon put`
+rewrites it. SPEC.md has the shapes and the rules a hub applies.
+
 ## Install
 
 ### Linux (systemd)
@@ -228,12 +256,18 @@ beacon exec <component> [--trigger T] -- <command> [args]
 beacon event deploy|config|change|note --title T [--component C] [--detail D]
              [--actor-kind person|agent|unit --actor NAME] [--link TITLE=URL]... [--ref TITLE=KIND:ID]...
 beacon run <component> --json FILE|-   log a finished run from a JSON document
-beacon put <component> [flags]         write a component's state by hand
+beacon put <component> [flags]         write a component's state by hand (--class, --item;
+                                       never reporting: that's beacon's)
+beacon check --envelope|--served|--component|--adapter|--run|--definition FILE|-
+                                       check a document of that kind (exit 0 valid, 1 invalid
+                                       with the reason)
+beacon check --definitions DIR [--only ID,...]
+                                       run each definition's adapters once and check them
 beacon serve                           serve state and log (read-only HTTP API)
 beacon log [--after N] [--limit N]     print log entries
 beacon brief [--since 24h]             the box in short, as Markdown (for people and AI agents)
 beacon token add|list|revoke [NAME]
-beacon validate
+beacon validate                        components, definitions and the log (class and reporting shown)
 beacon version
 ```
 
@@ -248,10 +282,12 @@ Settings come from flags or the environment (`BEACON_DATA`, `BEACON_ETC`, `BEACO
 | `/var/lib/beacon/components/*.json` | each component's state |
 | `/var/lib/beacon/log.jsonl` | runs and events (kept 90 days, at most 20,000 entries) |
 | `/var/lib/beacon/state.json` | beacon's bookkeeping (seen invocations, runs in progress, boot id) |
+| `/var/lib/beacon/good/*.json` | each state adapter's last good output (what a component shows while the adapter fails) |
+| `/var/lib/beacon/cache/*.json` | a `state_every` adapter's last result |
 
 ## Security
 
-- `serve` answers only `GET`/`HEAD` on `/healthz`, `/v2/state` and `/v2/log`, and reads
+- `serve` answers only `GET`/`HEAD` on `/healthz`, `/v3/state` and `/v3/log` (`/v2/*` is `404`), and reads
   only beacon's own files: regular files, no symlinks. Every request but `/healthz` needs
   a token; the tokens file stores only SHA-256 hashes.
 - State and runs are status, not storage: never put secrets in them. A failed run's error

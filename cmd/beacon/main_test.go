@@ -187,3 +187,95 @@ func TestValidateOldAndNewEvents(t *testing.T) {
 		t.Fatal("validate passed an event with a bad actor")
 	}
 }
+
+func writeFile(t *testing.T, dir, name, body string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestCheckDocuments(t *testing.T) {
+	dir := t.TempDir()
+	reporting := `{"id":"x","class":"service","updated_at":"2026-11-01T00:00:00Z","reporting":{"error":"state adapter failed","since":"2026-11-01T00:00:00Z","last_good_at":null}}`
+	for _, c := range []struct {
+		kind, doc string
+		valid     bool
+	}{
+		{"adapter", `{"status":"ok","items":[{"id":"a","title":"A"}]}`, true},
+		{"adapter", `{"status":"ok","class":"list"}`, false},
+		{"adapter", `{"status":"ok","reporting":null}`, false},
+		{"adapter", `nope`, false},
+		{"component", `{"status":"ok"}`, true},
+		{"component", reporting, false}, // reporting is beacon's alone
+		{"served", reporting, true},     // and valid as served
+		{"served", `{"id":"x","updated_at":"2026-11-01T00:00:00Z"}`, false},
+		{"definition", `{"id":"x","class":"advisory"}`, true},
+		{"definition", `{"id":"x","class":"nope"}`, false},
+		{"run", `{"type":"run","component":"x","id":"r1","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success"}`, true},
+		{"run", `{"type":"run","component":"x","id":"r1","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"ok"}`, false},
+		{"envelope", `{"schema":2}`, false},
+	} {
+		err := cmdCheck([]string{"--" + c.kind, writeFile(t, dir, "doc.json", c.doc)})
+		if c.valid && err != nil {
+			t.Errorf("--%s %s: %v", c.kind, c.doc, err)
+		}
+		if code, ok := err.(exitError); !c.valid && (!ok || code != 1) {
+			t.Errorf("--%s %s: %v, want exit 1", c.kind, c.doc, err)
+		}
+	}
+	if _, ok := cmdCheck([]string{"--adapter", "x", "--run", "y"}).(usageError); !ok {
+		t.Error("two kinds accepted")
+	}
+	if _, ok := cmdCheck(nil).(usageError); !ok {
+		t.Error("no kind accepted")
+	}
+}
+
+func TestCheckDefinitionsExitCodes(t *testing.T) {
+	dir := t.TempDir()
+	good := writeFile(t, dir, "g.state", "#!/bin/sh\necho '{\"status\":\"ok\"}'\n")
+	bad := writeFile(t, dir, "b.state", "#!/bin/sh\nexit 1\n")
+	writeFile(t, dir, "g.json", `{"id":"g","state":"`+good+`"}`)
+	writeFile(t, dir, "b.json", `{"id":"b","state":"`+bad+`"}`)
+	data := t.TempDir()
+	t.Setenv("BEACON_DATA", data)
+	if err := cmdCheck([]string{"--definitions", dir, "--only", "g"}); err != nil {
+		t.Errorf("only the good one: %v", err)
+	}
+	for _, args := range [][]string{{"--definitions", dir}, {"--definitions", dir, "--only", "g,missing"}} {
+		if code, ok := cmdCheck(args).(exitError); !ok || code != 1 {
+			t.Errorf("%v: want exit 1", args)
+		}
+	}
+	if entries, _ := os.ReadDir(data); len(entries) != 0 {
+		t.Errorf("check wrote %v", entries)
+	}
+}
+
+func TestPutClassItemsAndReporting(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("BEACON_DATA", dir)
+	if err := cmdPut([]string{"queue", "--class", "list", "--summary", "2 open", "--item", "a=Fix it|url=https://example.com/a|waiting|since=2026-11-01T09:00:00Z", "--item", "b=Look|status=warn|detail=soon"}); err != nil {
+		t.Fatal(err)
+	}
+	c, ok, err := spec.LoadComponent(filepath.Join(dir, "components"), "queue")
+	if !ok || err != nil || c.Class != spec.List || len(c.Items) != 2 || c.Items[0].Waiting == nil || c.Items[1].Status != spec.Warn {
+		t.Fatalf("%+v %v", c, err)
+	}
+	if err := cmdPut([]string{"plain", "--status", "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	if c, _, _ := spec.LoadComponent(filepath.Join(dir, "components"), "plain"); c == nil || c.Class != spec.Service {
+		t.Fatalf("class not defaulted: %+v", c)
+	}
+	doc := writeFile(t, dir, "r.json", `{"status":"ok","reporting":{"error":"x","since":"2026-11-01T00:00:00Z","last_good_at":null}}`)
+	if err := cmdPut([]string{"rep", "--json", doc}); err == nil {
+		t.Fatal("put accepted reporting")
+	}
+	if cmdPut([]string{"bad", "--class", "critical"}) == nil || cmdPut([]string{"bad", "--item", "a=A|waiting=no|x=1"}) == nil {
+		t.Fatal("bad class or item accepted")
+	}
+}

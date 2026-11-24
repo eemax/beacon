@@ -63,6 +63,11 @@ func TestUnitsCheck(t *testing.T) {
 	if k.Status != spec.Warn || n != 2 || !strings.HasPrefix(k.Detail, "2 failed: apt-daily.service, foo.timer") {
 		t.Errorf("others: %+v (%d)", k, n)
 	}
+	// systemd-run's transient units are left out; any other failed unit stays.
+	list := "run-u123.service loaded failed failed run\nrun-r7.scope loaded failed failed scope\n● run-u9.service loaded failed failed x\nrunner.service loaded failed failed Runner\nrun-backup.timer loaded failed failed t\nfoo.service loaded failed failed Foo\n"
+	if got := parseUnits(list); strings.Join(got, ",") != "runner.service,run-backup.timer,foo.service" {
+		t.Errorf("parseUnits with transient units: %v", got)
+	}
 	if got := parseUnits("apt-daily.service loaded failed failed Daily apt\n\nfoo.timer loaded failed failed Foo\n"); strings.Join(got, ",") != "apt-daily.service,foo.timer" {
 		t.Errorf("parseUnits: %v", got)
 	}

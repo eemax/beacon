@@ -204,3 +204,20 @@ func TestWriteEmptyAndCapped(t *testing.T) {
 		t.Errorf("capped brief:\n%s", out)
 	}
 }
+
+func TestBriefShowsClassAndReporting(t *testing.T) {
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	good := now.Add(-time.Hour)
+	wait := true
+	c := fresh("queue")
+	c.Class = spec.List
+	c.Items = []spec.Item{{ID: "a", Title: "A", Waiting: &wait}, {ID: "b", Title: "B"}}
+	c.Reporting = &spec.Reporting{Error: "state adapter failed: exit 1", Since: now.Add(-10 * time.Minute), LastGoodAt: &good}
+	var b strings.Builder
+	Write(&b, Input{Source: "box", Components: []*spec.Component{c}, Now: now, Window: 24 * time.Hour})
+	for _, want := range []string{"class: list", "reporting broken since", "last good output", "2 items, 1 waiting"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("brief lacks %q:\n%s", want, b.String())
+		}
+	}
+}
