@@ -122,7 +122,7 @@ func TestBrokenStateAdapterAndVanishedExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, _, _ := spec.LoadComponent(cfg.Components, "x")
-	if c.Status != spec.Fail || !strings.Contains(c.Summary, "oops") {
+	if c.Status != spec.Unknown || c.Reporting == nil || !strings.Contains(c.Reporting.Error, "oops") {
 		t.Fatalf("component = %+v", c)
 	}
 	entries, _, _, _ := logbook.Log{Path: cfg.Log}.Read(0, 10)
@@ -189,7 +189,7 @@ func TestBadAdapterOutputNeverCostsTheRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, _, err := spec.LoadComponent(cfg.Components, "x")
-	if err != nil || c.Status != spec.Fail || !strings.Contains(c.Summary, "appears twice") {
+	if err != nil || c.Status == spec.Fail || c.Reporting == nil || !strings.Contains(c.Reporting.Error, "appears twice") {
 		t.Fatalf("component = %+v, %v", c, err)
 	}
 	last := c.Checks[len(c.Checks)-1]
@@ -255,7 +255,7 @@ func TestServices(t *testing.T) {
 }
 
 func TestFit(t *testing.T) {
-	c := &spec.Component{ID: "x", UpdatedAt: time.Now()}
+	c := &spec.Component{ID: "x", Class: spec.Service, UpdatedAt: time.Now()}
 	for i := 0; i < 8; i++ {
 		c.Gauges = append(c.Gauges, spec.Metric{Key: "a", Value: 1, Primary: true, Labels: spec.Labels{"n": strings.Repeat("x", i+1)}})
 	}
@@ -312,5 +312,219 @@ func TestTimerNext(t *testing.T) {
 	}
 	if _, ok := timerNext("missing.timer", timers, running); ok {
 		t.Error("a missing timer counts as scheduled")
+	}
+}
+
+// define writes a definition with a state adapter whose script body can change.
+func define(t *testing.T, cfg Config, id, body string, extra map[string]any) string {
+	t.Helper()
+	adapter := script(t, cfg.Definitions, id+".state", body)
+	def := map[string]any{"id": id, "state": adapter}
+	for k, v := range extra {
+		def[k] = v
+	}
+	data, _ := json.Marshal(def)
+	if err := os.WriteFile(filepath.Join(cfg.Definitions, id+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return adapter
+}
+
+func collectAt(t *testing.T, cfg Config, at time.Time) {
+	t.Helper()
+	cfg.Now = func() time.Time { return at }
+	if _, err := Run(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func load(t *testing.T, cfg Config, id string) *spec.Component {
+	t.Helper()
+	c, ok, err := spec.LoadComponent(cfg.Components, id)
+	if !ok || err != nil {
+		t.Fatalf("component %s: %v %v", id, ok, err)
+	}
+	return c
+}
+
+const goodOut = `echo '{"status":"warn","summary":"fine","gauges":[{"key":"n","value":3}],"items":[{"id":"a","title":"A"}]}'`
+
+func TestReportingFirstRunFailsThenGoodAgain(t *testing.T) {
+	cfg := config(t)
+	start := time.Now().UTC().Truncate(time.Second)
+	adapter := define(t, cfg, "x", `echo boom >&2; exit 1`, nil)
+	collectAt(t, cfg, start)
+	c := load(t, cfg, "x")
+	if c.Status != spec.Unknown || c.Reporting == nil || c.Reporting.LastGoodAt != nil || !c.Reporting.Since.Equal(start) || !strings.Contains(c.Reporting.Error, "boom") {
+		t.Fatalf("no good output yet: %+v / %+v", c, c.Reporting)
+	}
+	if c.Class != spec.Service {
+		t.Fatalf("class = %q", c.Class)
+	}
+
+	// Good: clears reporting, and its output is what's kept.
+	os.WriteFile(adapter, []byte("#!/bin/sh\n"+goodOut+"\n"), 0o755)
+	collectAt(t, cfg, start.Add(time.Minute))
+	c = load(t, cfg, "x")
+	if c.Reporting != nil || c.Status != spec.Warn || len(c.Items) != 1 || c.Gauges[0].Key != "n" {
+		t.Fatalf("good again: %+v", c)
+	}
+
+	// Bad again, with the last good state kept: reporting set, the status is the kept one,
+	// never fail on this account; since is when this failure began, and it holds.
+	os.WriteFile(adapter, []byte("#!/bin/sh\nexit 3\n"), 0o755)
+	collectAt(t, cfg, start.Add(2*time.Minute))
+	collectAt(t, cfg, start.Add(3*time.Minute))
+	c = load(t, cfg, "x")
+	r := c.Reporting
+	if r == nil || c.Status != spec.Warn || c.Summary != "fine" || len(c.Items) != 1 || c.Gauges[0].Value != 3 {
+		t.Fatalf("last good not kept: %+v / %+v", c, r)
+	}
+	if r.LastGoodAt == nil || !r.LastGoodAt.Equal(start.Add(time.Minute)) || !r.Since.Equal(start.Add(2*time.Minute)) {
+		t.Fatalf("reporting times: %+v", r)
+	}
+
+	// The first good output clears it and replaces the kept state.
+	os.WriteFile(adapter, []byte("#!/bin/sh\necho '{\"status\":\"ok\",\"summary\":\"new\"}'\n"), 0o755)
+	collectAt(t, cfg, start.Add(4*time.Minute))
+	c = load(t, cfg, "x")
+	if c.Reporting != nil || c.Summary != "new" || len(c.Items) != 0 {
+		t.Fatalf("not cleared: %+v", c)
+	}
+	os.WriteFile(adapter, []byte("#!/bin/sh\nexit 1\n"), 0o755)
+	collectAt(t, cfg, start.Add(5*time.Minute))
+	c = load(t, cfg, "x")
+	if c.Summary != "new" || c.Reporting == nil || !c.Reporting.Since.Equal(start.Add(5*time.Minute)) {
+		t.Fatalf("kept state wasn't replaced: %+v / %+v", c, c.Reporting)
+	}
+}
+
+func TestReportingInvalidDocumentIsNotWrittenAsIs(t *testing.T) {
+	for name, doc := range map[string]string{
+		"unknown field": `{"status":"ok","stauts":"ok"}`,
+		"bad class":     `{"status":"ok","class":"critical"}`,
+		"class":         `{"status":"ok","class":"service"}`,
+		"reporting":     `{"status":"ok","reporting":{"error":"x","since":"2026-11-01T00:00:00Z","last_good_at":null}}`,
+		"bad status":    `{"status":"degraded"}`,
+		"not json":      `not json`,
+		"bad item":      `{"items":[{"id":"a","title":"A","waiting":false}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := config(t)
+			start := time.Now().UTC().Truncate(time.Second)
+			adapter := define(t, cfg, "x", goodOut, nil)
+			collectAt(t, cfg, start)
+			os.WriteFile(adapter, []byte("#!/bin/sh\ncat <<'EOF'\n"+doc+"\nEOF\n"), 0o755)
+			collectAt(t, cfg, start.Add(time.Minute))
+			c := load(t, cfg, "x")
+			if c.Reporting == nil || c.Status == spec.Fail || c.Summary != "fine" || c.Class != spec.Service {
+				t.Fatalf("%+v / %+v", c, c.Reporting)
+			}
+		})
+	}
+}
+
+func TestReportingHungAdapterIsKilledAndTheNextComponentGoesOn(t *testing.T) {
+	cfg := config(t)
+	cfg.Timeout = 2 * time.Second
+	start := time.Now().UTC().Truncate(time.Second)
+	hang := define(t, cfg, "a-hang", goodOut, nil)
+	define(t, cfg, "b-next", `echo '{"status":"ok","summary":"next"}'`, map[string]any{"class": "advisory"})
+	collectAt(t, cfg, start)
+	os.WriteFile(hang, []byte("#!/bin/sh\nsleep 60\n"), 0o755)
+	began := time.Now()
+	collectAt(t, cfg, start.Add(time.Minute))
+	if took := time.Since(began); took > 20*time.Second {
+		t.Fatalf("collect waited %s on a hung adapter", took)
+	}
+	c := load(t, cfg, "a-hang")
+	if c.Reporting == nil || !strings.Contains(c.Reporting.Error, "timed out") || c.Summary != "fine" || c.Status != spec.Warn {
+		t.Fatalf("hung: %+v / %+v", c, c.Reporting)
+	}
+	if n := load(t, cfg, "b-next"); n.Summary != "next" || n.Class != spec.Advisory || n.UpdatedAt.Before(start.Add(time.Minute)) {
+		t.Fatalf("next component: %+v", n)
+	}
+}
+
+func TestReportingStateEvery(t *testing.T) {
+	cfg := config(t)
+	counter := filepath.Join(t.TempDir(), "n")
+	start := time.Now().UTC().Truncate(time.Second)
+	adapter := define(t, cfg, "slow", "echo x >> "+counter+"\n"+goodOut, map[string]any{"state_every": "5m"})
+	collectAt(t, cfg, start) // good, cached
+	os.WriteFile(adapter, []byte("#!/bin/sh\necho x >> "+counter+"\nexit 1\n"), 0o755)
+	collectAt(t, cfg, start.Add(6*time.Minute)) // runs, fails, the failure is cached
+	failing := load(t, cfg, "slow")
+	if failing.Reporting == nil || failing.Summary != "fine" || !failing.Reporting.Since.Equal(start.Add(6*time.Minute)) {
+		t.Fatalf("failure: %+v / %+v", failing, failing.Reporting)
+	}
+	collectAt(t, cfg, start.Add(8*time.Minute)) // the cached failure: no run, still reporting, same since
+	c := load(t, cfg, "slow")
+	if runs, _ := os.ReadFile(counter); strings.Count(string(runs), "x") != 2 {
+		t.Fatalf("adapter ran %d times, want 2", strings.Count(string(runs), "x"))
+	}
+	if c.Reporting == nil || c.Summary != "fine" || c.Status != spec.Warn || !c.Reporting.Since.Equal(failing.Reporting.Since) {
+		t.Fatalf("cached failure: %+v / %+v", c, c.Reporting)
+	}
+	// A cached good output (from a run elsewhere) after a failure clears reporting.
+	good, _ := json.Marshal(cached{At: start.Add(9 * time.Minute), Out: json.RawMessage(`{"status":"ok","summary":"cached good"}`)})
+	os.WriteFile(filepath.Join(filepath.Dir(cfg.State), "cache", "slow.json"), good, 0o600)
+	collectAt(t, cfg, start.Add(10*time.Minute))
+	c = load(t, cfg, "slow")
+	if c.Reporting != nil || c.Summary != "cached good" {
+		t.Fatalf("cached good: %+v / %+v", c, c.Reporting)
+	}
+}
+
+func TestReportingCheckDefinitions(t *testing.T) {
+	cfg := config(t)
+	data := t.TempDir()
+	okState := script(t, cfg.Definitions, "ok.state", `echo '{"status":"ok"}'`)
+	okRun := script(t, cfg.Definitions, "ok.run", `echo '{"summary":"1 record","stats":[{"key":"n","value":1}]}'`)
+	write := func(id string, def map[string]any) {
+		def["id"] = id
+		b, _ := json.Marshal(def)
+		os.WriteFile(filepath.Join(cfg.Definitions, id+".json"), b, 0o644)
+	}
+	write("ok", map[string]any{"state": okState, "run": okRun})
+	write("plain", map[string]any{})
+	write("exit", map[string]any{"state": script(t, cfg.Definitions, "exit.state", `exit 2`)})
+	write("json", map[string]any{"state": script(t, cfg.Definitions, "json.state", `echo nope`)})
+	write("class", map[string]any{"state": script(t, cfg.Definitions, "class.state", `echo '{"class":"list"}'`)})
+	write("hang", map[string]any{"state": script(t, cfg.Definitions, "hang.state", `sleep 60`)})
+	write("badrun", map[string]any{"run": script(t, cfg.Definitions, "badrun.run", `echo '{"stats":[{"key":"Bad Key","value":1}]}'`)})
+	write("env", map[string]any{"state": script(t, cfg.Definitions, "env.state", `[ "$BEACON_COMPONENT" = env ] && echo '{}'`)})
+	os.WriteFile(filepath.Join(cfg.Definitions, "broken.json"), []byte(`{"id":"broken","state_every":"5m"}`), 0o644)
+
+	lines, bad := CheckDefinitions(context.Background(), cfg.Definitions, nil, 2*time.Second)
+	got := map[string]string{}
+	for _, l := range lines {
+		status, rest, _ := strings.Cut(l, " ")
+		id, why, _ := strings.Cut(rest, ":")
+		got[id] = status + why
+	}
+	for _, id := range []string{"ok", "plain", "env"} {
+		if got[id] != "ok" {
+			t.Errorf("%s: %q", id, got[id])
+		}
+	}
+	for id, want := range map[string]string{"exit": "state adapter", "json": "state adapter", "class": "state adapter", "hang": "timed out",
+		"badrun": "run adapter", "broken": "definition"} {
+		if !strings.HasPrefix(got[id], "BAD") || !strings.Contains(got[id], want) {
+			t.Errorf("%s: %q", id, got[id])
+		}
+	}
+	if bad != 6 {
+		t.Errorf("bad = %d: %v", bad, lines)
+	}
+	// Only the listed ones; an id without a definition is bad; all valid: none bad.
+	if lines, bad = CheckDefinitions(context.Background(), cfg.Definitions, []string{"ok", "plain"}, time.Second); bad != 0 || len(lines) != 2 {
+		t.Errorf("only valid: %v (%d)", lines, bad)
+	}
+	if lines, bad = CheckDefinitions(context.Background(), cfg.Definitions, []string{"ok", "missing"}, time.Second); bad != 1 || lines[len(lines)-1] != "BAD missing: no definition" {
+		t.Errorf("unknown id: %v (%d)", lines, bad)
+	}
+	if entries, _ := os.ReadDir(data); len(entries) != 0 {
+		t.Errorf("wrote %v", entries)
 	}
 }

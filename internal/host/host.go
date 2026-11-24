@@ -76,7 +76,7 @@ func component(now time.Time, s sample, in Input, victims func(since time.Time) 
 	memUsed := pct(s.memTotal-s.memAvail, s.memTotal)
 	diskUsed := pct(s.diskUsed, s.diskUsed+s.diskFree)
 	c := &spec.Component{
-		ID: "host", Title: "Host", Group: "System", Description: "The box itself: load, memory, disk, uptime, failed units, OOM kills, pending reboot.",
+		ID: "host", Class: spec.Service, Title: "Host", Group: "System", Description: "The box itself: load, memory, disk, uptime, failed units, OOM kills, pending reboot.",
 		UpdatedAt: now, ExpectEvery: "5m",
 	}
 	g := func(key, label string, value float64, unit string, primary bool) {
@@ -312,12 +312,19 @@ func humanUptime(seconds float64) string {
 	return fmt.Sprintf("%dm", mins)
 }
 
-// parseUnits takes the unit names from `systemctl list-units --plain --no-legend`.
+// transient is a unit systemd-run made (run-u1234.service, run-r5.scope): it exists for one
+// command, so its failure says nothing about the box.
+func transient(unit string) bool {
+	return strings.HasPrefix(unit, "run-") && (strings.HasSuffix(unit, ".service") || strings.HasSuffix(unit, ".scope"))
+}
+
+// parseUnits takes the unit names from `systemctl list-units --plain --no-legend`, without
+// transient run-*.service and run-*.scope units.
 func parseUnits(out string) []string {
 	var units []string
 	for _, line := range strings.Split(out, "\n") {
 		f := strings.Fields(strings.TrimPrefix(strings.TrimSpace(line), "●"))
-		if len(f) > 0 && strings.Contains(f[0], ".") {
+		if len(f) > 0 && strings.Contains(f[0], ".") && !transient(f[0]) {
 			units = append(units, f[0])
 		}
 	}
