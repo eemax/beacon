@@ -276,7 +276,7 @@ The installer that deploys your app (not the app itself) checks before it instal
 logs a deploy event after:
 
 ```bash
-# before installing: what the new version's adapters print must still be valid
+# before the new version goes live: what its adapters print must still be valid
 beacon check --definitions /etc/beacon/components.d --only <id> || exit 1
 
 # after: a deploy event, so changes line up with what happened on the timeline
@@ -290,7 +290,7 @@ fi
 `beacon check --definitions` runs each listed definition's state adapter and run adapter
 once and checks what they print (a run adapter only reads, so that's safe), writing
 nothing; it exits 1 on any bad one, so a deploy that would break a report is refused
-there, before anything changes. Log the deploy event only when the version actually
+there, before the new version goes live. Log the deploy event only when the version actually
 changed. `--actor-kind person|agent|unit --actor <name>` says who deployed, `--ref` and
 `--link "Changes=<url>"` what it points to, so a hub can show "deployed by …" next to what
 broke after it, and a feed of who changed what. Other changes to the box's setup (a key
