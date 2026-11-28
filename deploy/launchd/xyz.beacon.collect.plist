@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- beacon collect every minute, as root (/Library/LaunchDaemons). -->
+<!-- beacon collect every minute, as the user (~/Library/LaunchAgents; README → macOS).
+     Replace USER; beacon here is the release binary or a wrapper setting the same environment. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>xyz.beacon.collect</string>
   <key>ProgramArguments</key>
-  <array><string>/usr/local/bin/beacon</string><string>collect</string></array>
+  <array><string>/Users/USER/.local/bin/beacon</string><string>collect</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BEACON_DATA</key><string>/Users/USER/Library/Application Support/beacon</string>
+    <key>BEACON_ETC</key><string>/Users/USER/.config/beacon</string>
+    <key>PATH</key><string>/Users/USER/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>StartInterval</key><integer>60</integer>
   <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
   <key>LowPriorityIO</key><true/>
-  <key>Nice</key><integer>10</integer>
-  <key>StandardErrorPath</key><string>/var/log/beacon-collect.log</string>
+  <key>StandardErrorPath</key><string>/Users/USER/Library/Logs/beacon-collect.log</string>
 </dict>
 </plist>

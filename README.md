@@ -72,7 +72,7 @@ didn't happen (`schedule.grace` after it was due).
 ### Adapters
 
 Adapters are how a component says what only it knows. Each is an executable (no
-arguments, run as root, 30 s limit) that prints one JSON object:
+arguments, run as root (on macOS as the user), 30 s limit) that prints one JSON object:
 
 - the **run adapter** gets the finished run in its environment (`BEACON_COMPONENT`,
   `BEACON_RUN_ID`, `BEACON_RUN_UNIT`, `BEACON_RUN_OUTCOME`, `BEACON_RUN_EXIT_CODE`,
@@ -235,18 +235,26 @@ tunnel, assigns the address and prints the token: pass them as `--tunnel-token` 
 
 ### macOS (launchd)
 
-No installer yet; launchd plays systemd's part. Put the release binary in
-`/usr/local/bin/beacon`, set the tunnel address in `xyz.beacon.serve.plist`, then:
+No installer: on a Mac beacon runs as **the user**, as LaunchAgents, so it needs no root
+except for one address. The binary is the release's `beacon-darwin-<arch>` (checked against
+`SHA256SUMS`); the data and definitions live in the user's folders, set by the environment
+(`BEACON_DATA`, `BEACON_ETC`, `BEACON_SOURCE`, `BEACON_LISTEN`), which a small wrapper on
+`PATH` sets for every caller, so `beacon brief`, `put`, `run` and `exec` work from any shell
+or job. The templates in `deploy/launchd/`:
 
-```bash
-sudo mkdir -p /etc/beacon/components.d /var/lib/beacon
-sudo cp deploy/launchd/*.plist /Library/LaunchDaemons/
-sudo launchctl bootstrap system /Library/LaunchDaemons/xyz.beacon.collect.plist
-sudo launchctl bootstrap system /Library/LaunchDaemons/xyz.beacon.serve.plist
-sudo cloudflared service install "$(cat tunnel.token)"
-```
+| Job | What |
+|---|---|
+| `xyz.beacon.collect` (LaunchAgent) | `beacon collect` every 60 s: the `host` component (load, memory, disk, swap, uptime) and the definitions' state adapters |
+| `xyz.beacon.serve` (LaunchAgent) | `beacon serve` on the tunnel address, kept alive |
+| `xyz.beacon.addr` (LaunchDaemon, root) | only `ifconfig lo0 alias <address>/32` at boot: Cloudflare won't connect a Worker to loopback, and only root can add the address |
+| cloudflared (LaunchAgent) | `cloudflared tunnel run` with `TUNNEL_TOKEN` in its environment from a secret store (never a file), outbound only |
 
-Wrap launchd jobs in `beacon exec` (in their `ProgramArguments`) to log their runs.
+Differences from Linux: there's no systemd, so a component's runs come from `beacon exec`
+(wrap the job's `ProgramArguments`) or `beacon run --json` from the job itself, never from
+`systemd.units`; adapters run as the user, not root, with the user's `HOME`, so they can use
+the user's tools (a keychain-backed secret store, a CLI in `~/.local/bin`); LaunchAgents run
+from the user's login on, so a Mac rebooted to the login window is unreachable until someone
+logs in (the hub sees the box unreachable, its components as they last were).
 
 ## Commands
 

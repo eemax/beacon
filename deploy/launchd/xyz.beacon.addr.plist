@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The one root part of beacon on a Mac (/Library/LaunchDaemons; README → macOS): the tunnel
+     address on lo0 at boot, nothing else. Replace 10.249.0.X. Nothing routes to it from outside. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>xyz.beacon.addr</string>
+  <key>ProgramArguments</key>
+  <array><string>/sbin/ifconfig</string><string>lo0</string><string>alias</string><string>10.249.0.X/32</string></array>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>

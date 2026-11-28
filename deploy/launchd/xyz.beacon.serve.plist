@@ -1,19 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- beacon serve on the tunnel address (from `lookout source tunnel <box>`): replace
-     10.249.0.X below. The address is added to lo0 first; nothing routes to it from outside.
-     Runs as root (no systemd sandbox here); serve is read-only either way. -->
+<!-- beacon serve as the user (~/Library/LaunchAgents; README → macOS), on the tunnel address
+     (from `lookout source tunnel <box>`): replace 10.249.0.X and USER. The address is on lo0
+     through xyz.beacon.addr (root); until it is, serve exits and launchd retries. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>xyz.beacon.serve</string>
   <key>ProgramArguments</key>
-  <array>
-    <string>/bin/sh</string><string>-c</string>
-    <string>/sbin/ifconfig lo0 alias 10.249.0.X/32 &amp;&amp; exec /usr/local/bin/beacon serve --listen 10.249.0.X:7600</string>
-  </array>
+  <array><string>/Users/USER/.local/bin/beacon</string><string>serve</string><string>--listen</string><string>10.249.0.X:7600</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BEACON_DATA</key><string>/Users/USER/Library/Application Support/beacon</string>
+    <key>BEACON_ETC</key><string>/Users/USER/.config/beacon</string>
+  </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ThrottleInterval</key><integer>5</integer>
-  <key>StandardErrorPath</key><string>/var/log/beacon-serve.log</string>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardErrorPath</key><string>/Users/USER/Library/Logs/beacon-serve.log</string>
 </dict>
 </plist>
