@@ -216,6 +216,11 @@ func TestCheckDocuments(t *testing.T) {
 		{"definition", `{"id":"x","class":"nope"}`, false},
 		{"run", `{"type":"run","component":"x","id":"r1","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success"}`, true},
 		{"run", `{"type":"run","component":"x","id":"r1","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"ok"}`, false},
+		// a run may leave out type, seq, component and id (SPEC.md: what beacon run fills in)
+		{"run", `{"started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success","stats":[{"key":"files","value":6,"unit":"count"}]}`, true},
+		{"run", `{"type":"event","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success"}`, false},
+		{"run", `{"component":"Bad Id","started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success"}`, false},
+		{"run", `{"started_at":"2026-11-01T00:00:00Z","ended_at":"2026-11-01T00:00:01Z","outcome":"success","nope":1}`, false},
 		{"envelope", `{"schema":2}`, false},
 	} {
 		err := cmdCheck([]string{"--" + c.kind, writeFile(t, dir, "doc.json", c.doc)})

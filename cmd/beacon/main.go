@@ -542,8 +542,27 @@ var documentKinds = map[string]func([]byte) error{
 	"served":     func(b []byte) error { _, err := spec.ParseComponent(b); return err },
 	"component":  func(b []byte) error { _, err := spec.ParseProducerComponent(b); return err },
 	"adapter":    func(b []byte) error { _, err := spec.ParseAdapter(b); return err },
-	"run":        func(b []byte) error { _, err := spec.ParseRun(b); return err },
+	"run":        checkRun,
 	"definition": func(b []byte) error { _, err := collect.ParseDefinition(b); return err },
+}
+
+// checkRun checks a run as SPEC.md has it: a run may leave out type, seq, component and id
+// (what `beacon run` fills in); one that gives them is held to them.
+func checkRun(b []byte) error {
+	var r spec.Run
+	if err := spec.Decode(b, &r); err != nil {
+		return err
+	}
+	if r.Type == "" {
+		r.Type = "run"
+	}
+	if r.Component == "" {
+		r.Component = "check"
+	}
+	if r.ID == "" {
+		r.ID = "check"
+	}
+	return r.Validate()
 }
 
 // cmdCheck checks a document against the schema (exit 0 valid, 1 invalid with the reason),
